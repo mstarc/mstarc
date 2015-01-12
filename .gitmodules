@@ -1,0 +1,4 @@
+[submodule "libs/corelib-web"]
+	path = libs/corelib-web
+	url = git@bitbucket.org:visionscaper/corelib-web.git
+
