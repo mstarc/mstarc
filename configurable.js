@@ -21,6 +21,7 @@
          * that uses this mixin.
          *
          * @class   Configurable
+         * @module  M*C
          *
          */
 
@@ -41,7 +42,7 @@
          *
          */
         _addConfigProperties : function(config) {
-            var me = "[{0}]Configurable::_addConfigProperties".fmt(_.do(this, 'getName') || '[UNKOWN]');
+            var me = "[{0}]Configurable::_addConfigProperties".fmt(_.call(this, 'getIName') || '[UNKOWN]');
 
             if (!_.obj(config)) {
                 //Nothing to do
