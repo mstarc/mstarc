@@ -12,19 +12,28 @@
     var Class               = window.jsface.Class;
     var NamedBase           = NS.NamedBase;
     var Configurable        = NS.Configurable;
-    var NotificationCapable = NS.NotificationCapable;
+    var DispatchesEvent     = NS.DispatchesEvent;
 
-    NS.MVCComponent = Class([NamedBase, Configurable, NotificationCapable], {
+    NS.MVCComponent = Class([NamedBase, Configurable, DispatchesEvent], {
 
         $statics : {
             REQUIRED_COMPONENT_CONNECT_API : {
-                methods : ['getIName', 'register', 'isModel', 'isController', 'isView']
+                methods : ['getIName', 'register', 'isModel', 'isController', 'isView', 'processEvent']
             }
         },
 
+        _isReady    : false,
+        _eventQueue : [],
+
         /**
          *
-         * MVCComponent provides functionality shared by the Model, View and Controller classes
+         * MVCComponent provides functionality shared by the Model, View and Controller classes.
+         *
+         * When the component is ready to process events you need to call this._readyToProcessEvents() in your subclass
+         *
+         *
+         * Methods to override:
+         * _componentIsReady
          *
          * @class           MVCComponent
          * @module          M*C
@@ -80,6 +89,29 @@
             return false;
         },
 
+        processEvent : function(origin, eventName, eventData, eventProcessedCb) {
+            var me      = "{0}::MVCComponent::processEvent".fmt(this.getIName());
+            var success = false;
+
+            if (!_.hasMethod(this, eventName)) {
+                _l.debug(me, "No method available to process event {0}, not processing".fmt(eventName));
+                return success;
+            }
+
+            if (this._componentIsReady()) {
+                this[eventName].call(this, origin, eventData, eventProcessedCb);
+            } else {
+                this._eventQueue.push({
+                    origin      : origin,
+                    name        : eventName,
+                    data        : eventData,
+                    callback    : eventProcessedCb
+                });
+            }
+
+            return (success = true);
+        },
+
         /**
          *
          * Returns if instance is a model
@@ -119,6 +151,42 @@
          *
          *********************************************************************/
 
+        _componentIsReady : function() {
+            return this._isReady;
+        },
+
+        _processEventQueue : function() {
+            var self    = this;
+            var event   = null;
+            while (!_.empty(this._eventQueue)) {
+                event = this._eventQueue.shift();
+
+                if (!_.obj(event)) {
+                    continue;
+                }
+
+                //schedule in new run loop
+                setTimeout(function() {
+                    if (_.hasMethod(self, event.name)) {
+                        self[event.name].call(self, event.origin, event.data, event.callback);
+                    } else {
+                        var iName = self.getIName();
+
+                        event.callback = _.ensureFunc(event.callback);
+                        event.callback({
+                            message : "UNEXPECTED : MVC component {0} does not have a method to process {1} events"
+                                      .fmt(iName, event.name)
+                        });
+                    }
+                }, 0);
+            }
+        },
+
+        _readyToProcessEvents : function() {
+            this._processEventQueue();
+            this._isReady = true;
+        },
+
         _countRegisteredOfType : function(componentType) {
             var me = "{0}::MVCComponent::_countRegisteredOfType".fmt(this.getIName());
             var count = -1;
@@ -131,15 +199,15 @@
             count = 0;
             var typeAssessor = "is" + _.capitaliseFirst(componentType);
 
-            var listenerNames = Object.getOwnPropertyNames(this._listeners);
+            var processorNames = Object.getOwnPropertyNames(this._processors);
 
-            var listenerName = null;
-            var listener = null;
-            for (var idx in listenerNames) {
-                listenerName = listenerNames[idx];
-                listener     = this._listeners[listenerName];
+            var processorName = null;
+            var processor = null;
+            for (var idx in processorNames) {
+                processorName = processorNames[idx];
+                processor     = this._processors[processorName];
 
-                count += ((_.call(listener, typeAssessor, listenerName) === true) ? 1 : 0);
+                count += ((_.call(processor, typeAssessor, processorName) === true) ? 1 : 0);
             }
 
             return count;

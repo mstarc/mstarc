@@ -14,6 +14,8 @@
 
     NS.View = Class(MVCComponent, {
 
+        _controller : null,
+
         /**
          *
          * An abstract View class:
@@ -70,12 +72,46 @@
          */
         isView : function() {
             return true;
-        }
+        },
 
         /*********************************************************************
          *
          * PROTECTED METHODS
          *
          *********************************************************************/
+
+        _didRegister : function(processorName, processor) {
+            if (_.call(processor, 'isController', processorName) === true) {
+                this._controller = processor;
+            }
+        },
+
+        /**
+         *
+         * @param eventName
+         * @param eventData
+         * @param [eventProcessedCb]
+         * @param {boolean} [throttle = false]      dispatch will be throttled if true
+         * @param {number} [throttleDelay]          Optional custom throttleDelay, relevant when throttled = true
+         * @returns {boolean}
+         *
+         * @protected
+         */
+        _dispatchToController : function(eventName, eventData, eventProcessedCb, throttle, throttleDelay) {
+            var success = false;
+
+            if (!_.bool(throttle)) {
+                throttle = false;
+            }
+
+            var c = this._controller;
+            if (!throttle) {
+                success = this._dispatchEvent(c, eventName, eventData, eventProcessedCb);
+            } else {
+                success = this._scheduleEventDispatch(c, eventName, eventData, eventProcessedCb, throttleDelay);
+            }
+
+            return success;
+        }
     });
 })();

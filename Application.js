@@ -94,18 +94,32 @@
                 return success;
             }
 
+            _l.info(me, "Creating component {0} ...".fmt(componentName));
+
             var constructorArgs = extraArguments || [];
             constructorArgs.unshift(componentName);
 
             //A way to construct using call
             var factoryFunction = mvcComponentClass.bind.call(mvcComponentClass, constructorArgs);
-            var component = new factoryFunction();
+            var component       = new factoryFunction();
 
             this._MVCComponents[componentName] = component;
 
             return (success = true);
-        }
+        },
 
+        getComponent : function(componentName) {
+            return this._MVCComponents[componentName];
+        },
+
+        removeComponent : function(componentName) {
+            var me      = "{0}::Application::create".fmt(this.getIName());
+
+            if (_.def(this._MVCComponents[componentName])) {
+                _l.info(me, "Removing component {0} ...".fmt(componentName));
+                delete this._MVCComponents[componentName];
+            }
+        }
 
         /*********************************************************************
          *

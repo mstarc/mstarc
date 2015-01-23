@@ -67,7 +67,9 @@
         },
 
         allowedToRegister : function(component) {
-            return (_.call(component, 'isController', _.call(component, 'getIName')) === true);
+            var compName = _.call(component, 'getIName') || "[UNKNOWN]";
+
+            return (_.call(component, 'isController', compName) === true);
         },
 
         /**
@@ -98,7 +100,22 @@
             _l.info(me, "If you don't need data pushed from resource managers, " +
                         "override this method by simply returning true.");
             return success;
-        }
+        },
 
+        _dispatchToControllers : function(eventName, eventData, eventProcessedCb, throttle, throttleDelay) {
+            var success = false;
+
+            if (!_.bool(throttle)) {
+                throttle = false;
+            }
+
+            if (!throttle) {
+                success = this._dispatch(eventName, eventData, eventProcessedCb);
+            } else {
+                success = this._dispatchThrottled(eventName, eventData, eventProcessedCb, throttleDelay);
+            }
+
+            return success;
+        }
     });
 })();

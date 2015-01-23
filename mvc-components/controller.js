@@ -14,7 +14,10 @@
 
     NS.Controller = Class(MVCComponent, {
 
-        _stateManager : null,
+        _stateManager   : null,
+
+        _view           : null,
+        _model          : null,
 
         /**
          *
@@ -25,9 +28,10 @@
          *  - based on user input from the view can notify a stateManager and provide new data or data changes back
          *    to the model
          *
-         * Although a controller connects in principle to only one model, it can connect to multiple models.
+         * Although a controller connects in principle to only one model, it can register to multiple model.
          * This allows a controller to listen to specific details of secondary models such the same data doesn't
-         * have to be presented by multiple models
+         * have to be presented by multiple models. However, the controller only communicates back to the controller
+         * it is connected to.
          *
          * A controller can only be connected to one view.
          *
@@ -96,12 +100,76 @@
          */
         isController : function() {
             return true;
-        }
+        },
 
         /*********************************************************************
          *
          * PROTECTED METHODS
          *
          *********************************************************************/
+
+        _didRegister : function(processorName, processor) {
+            if (_.call(processor, 'isModel', processorName) === true) {
+                this._model = processor;
+            } else if (_.call(processor, 'isView', processorName) === true) {
+                this._view = processor;
+            }
+        },
+
+        /**
+         *
+         * @param eventName
+         * @param eventData
+         * @param [eventProcessedCb]
+         * @param {boolean} [throttle = false]      dispatch will be throttled if true
+         * @param {number} [throttleDelay]          Optional custom throttleDelay, relevant when throttled = true
+         * @returns {boolean}
+         *
+         * @protected
+         */
+        _dispatchToModel : function(eventName, eventData, eventProcessedCb, throttle, throttleDelay) {
+            var success = false;
+
+            if (!_.bool(throttle)) {
+                throttle = false;
+            }
+
+            var m = this._model;
+            if (!throttle) {
+                success = this._dispatchEvent(m, eventName, eventData, eventProcessedCb);
+            } else {
+                success = this._scheduleEventDispatch(m, eventName, eventData, eventProcessedCb, throttleDelay);
+            }
+
+            return success;
+        },
+
+        /**
+         *
+         * @param eventName
+         * @param eventData
+         * @param [eventProcessedCb]
+         * @param {boolean} [throttle = false]      dispatch will be throttled if true
+         * @param {number} [throttleDelay]          Optional custom throttleDelay, relevant when throttled = true
+         * @returns {boolean}
+         *
+         * @protected
+         */
+        _dispatchToView : function(eventName, eventData, eventProcessedCb, throttle, throttleDelay) {
+            var success = false;
+
+            if (!_.bool(throttle)) {
+                throttle = false;
+            }
+
+            var v = this._view;
+            if (!throttle) {
+                success = this._dispatchEvent(v, eventName, eventData, eventProcessedCb);
+            } else {
+                success = this._scheduleEventDispatch(v, eventName, eventData, eventProcessedCb, throttleDelay);
+            }
+
+            return success;
+        }
     });
 })();
