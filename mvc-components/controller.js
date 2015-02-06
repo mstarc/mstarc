@@ -36,10 +36,21 @@
          * A controller can only be connected to one view.
          *
          * DON'T FORGET:
-         * When applicable, you have to mark this._valid = true or false in your Controller subclass constructor
-         * to mark the instance validity.
          *
-         * @class           Model
+         * * When the component is ready to process events you need to call this._readyToProcessEvents()
+         * in your subclass
+         *
+         *
+         * Methods you need to override in subclasses :
+         *
+         *  - _setup()                              Sets up the controller using the given state managers and
+         *                                          configuration properties.  This is also the place where you
+         *                                          validate your state manager and configuration properties.
+         *
+         *                                          Returns true on success else false
+         *
+         *
+         * @class           Controller
          * @module          M*C
          *
          * @extends         MVCComponent
@@ -59,6 +70,12 @@
             NS.Controller.$super.call(this, controllerName, config);
 
             this._stateManager          = stateManager;
+
+            this._valid = true;
+            if (!this._setup()) {
+                _l.error(me, "Controller setup failed, controller wil not function properly");
+                this._valid = false;
+            }
         },
 
         allowedToRegister : function(component) {
@@ -107,6 +124,15 @@
          * PROTECTED METHODS
          *
          *********************************************************************/
+
+        _setup : function() {
+            var me      = "{0}::Controller::_setup".fmt(this.getIName());
+            var success = false;
+
+            _l.error(me, "No implementation given, don't know how to setup this controller");
+            _l.info(me, "If you don't need to do any set up, just override this method by simply returning true");
+            return success;
+        },
 
         _didRegister : function(processorName, processor) {
             if (_.call(processor, 'isModel', processorName) === true) {

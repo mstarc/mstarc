@@ -183,8 +183,16 @@
         },
 
         _readyToProcessEvents : function() {
-            this._processEventQueue();
-            this._isReady = true;
+            var iName   = this.getIName();
+            var me      = "{0}::MVCComponent::_readyToProcessEvents".fmt(iName);
+
+            if (this.isValid()) {
+                this._processEventQueue();
+                this._isReady = true;
+            } else {
+                _l.error(me, ("Component {0} is not valid, unable to go to ready state " +
+                                "and process queued events").fmt(iName));
+            }
         },
 
         _countRegisteredOfType : function(componentType) {
