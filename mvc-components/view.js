@@ -24,9 +24,20 @@
          *
          * The controller ensures that the model data is provided to the view in a way that the view able to render.
          *
+         *
          * DON'T FORGET:
-         * When applicable, you have to mark this._valid = true or false in your View subclass constructor
-         * to mark the instance validity.
+         *
+         * * When the component is ready to process events you need to call this._readyToProcessEvents()
+         * in your subclass
+         *
+         *
+         * Methods you need to override in subclasses :
+         *
+         *  - _setup()                          Sets up the view using the given configuration properties.
+         *                                      This is also the place where you validate configuration properties.
+         *
+         *                                      Returns true on success else false
+         *
          *
          * @class           View
          * @module          M*C
@@ -44,6 +55,12 @@
         constructor: function (viewName, config) {
             var me = "View::constructor";
             NS.Controller.$super.call(this, viewName, config);
+
+            this._valid = true;
+            if (!this._setup()) {
+                _l.error(me, "Controller setup failed, controller wil not function properly");
+                this._valid = false;
+            }
         },
 
         allowedToRegister : function(component) {
@@ -79,6 +96,14 @@
          * PROTECTED METHODS
          *
          *********************************************************************/
+        _setup : function() {
+            var me      = "{0}::Controller::_setup".fmt(this.getIName());
+            var success = false;
+
+            _l.error(me, "No implementation given, don't know how to setup this view");
+            _l.info(me, "If you don't need to do any set up, just override this method by simply returning true");
+            return success;
+        },
 
         _didRegister : function(processorName, processor) {
             if (_.call(processor, 'isController', processorName) === true) {
