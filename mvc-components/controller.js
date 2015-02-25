@@ -14,6 +14,12 @@
 
     NS.Controller = Class(MVCComponent, {
 
+        $statics : {
+            REQUIRED_STATE_MANAGER_API : {
+                methods : ['sendEvent']
+            }
+        },
+
         _stateManager   : null,
 
         _view           : null,
@@ -41,13 +47,15 @@
          * in your subclass
          *
          *
-         * Methods you need to override in subclasses :
+         * Methods you optionally can override in subclasses :
          *
          *  - _setup()                              Sets up the controller using the given state managers and
          *                                          configuration properties.  This is also the place where you
          *                                          validate your state manager and configuration properties.
          *
          *                                          Returns true on success else false
+         *
+         *                                          This method is called during construction.
          *
          *
          * @class           Controller
@@ -129,8 +137,14 @@
             var me      = "{0}::Controller::_setup".fmt(this.getIName());
             var success = false;
 
-            _l.error(me, "No implementation given, don't know how to setup this controller");
-            _l.info(me, "If you don't need to do any set up, just override this method by simply returning true");
+            if (_.interfaceAdheres(this._stateManager, NS.Controller.REQUIRED_STATE_MANAGER_API)) {
+                success = true;
+            } else {
+                _l.error(me, "Statemanager does not adhere to required interface");
+                _l.info(me, "Statemanager must adhere to following interface definition",
+                        NS.Controller.REQUIRED_STATE_MANAGER_API);
+            }
+
             return success;
         },
 

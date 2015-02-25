@@ -38,6 +38,8 @@
          *
          *                                      Returns true on success else false
          *
+         *                                      This method is called during construction.
+         *
          *
          * @class           View
          * @module          M*C

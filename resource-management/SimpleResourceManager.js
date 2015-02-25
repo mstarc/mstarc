@@ -16,6 +16,13 @@
 
     NS.SimpleResourceManager    = Class([ResourceManager, SpeaksREST], {
 
+        $statics : {
+            REQUIRED_HTTP_API_CLIENT_API : {
+                methods : ['request']
+            }
+        },
+
+
         /**
          *
          * A simple resource manager uses a HTTP API client to create, update, get and deleted resources
