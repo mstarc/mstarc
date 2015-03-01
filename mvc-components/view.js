@@ -15,6 +15,7 @@
     NS.View = Class(MVCComponent, {
 
         _controller : null,
+        _didRender  : false,
 
         /**
          *
@@ -25,12 +26,6 @@
          * The controller ensures that the model data is provided to the view in a way that the view able to render.
          *
          *
-         * DON'T FORGET:
-         *
-         * * When the component is ready to process events you need to call this._readyToProcessEvents()
-         * in your subclass
-         *
-         *
          * Methods you need to override in subclasses :
          *
          *  - _setup()                          Sets up the view using the given configuration properties.
@@ -39,6 +34,21 @@
          *                                      Returns true on success else false
          *
          *                                      This method is called during construction.
+         *
+         *  - _render                           Implements the actual rendering of the view.
+         *
+         *                                      This method is called by the public render method
+         *
+         * Methods you can OPTIONALLY override in subclasses :
+         *
+         *  - _onRendered                       Called after the view is rendered
+         *
+         *
+         *  NOTE:
+         *
+         *  _readyToProcessEvents() is called by _onViewRendered() which must be called when rendering successfully
+         *  completed. _onViewRendered() subsequently calls _onRendered, which must be overridden in you subclass.
+         *
          *
          *
          * @class           View
@@ -56,13 +66,52 @@
          */
         constructor: function (viewName, config) {
             var me = "View::constructor";
-            NS.Controller.$super.call(this, viewName, config);
+            NS.View.$super.call(this, viewName, config);
 
             this._valid = true;
             if (!this._setup()) {
                 _l.error(me, "Controller setup failed, controller wil not function properly");
                 this._valid = false;
             }
+        },
+
+        /**
+         *
+         * Renders view.
+         * This method can only be called once unless forceRerender is set to true.
+         *
+         * @param {boolean} [forceRerender=false]   When true, forces rerendering even if the view was already rendered.
+         *
+         * @returns {boolean}                       True if initiation of rendering was successful else false
+         *
+         */
+        render : function(forceRerender) {
+            var me = "{0}::View::render".fmt(this.getIName());
+            var success = false;
+
+            if (!_.bool(forceRerender)) {
+                forceRerender = false;
+            }
+
+            if (this.isValid()) {
+                _l.error(me, "View not valid, unable to render");
+                return success
+            }
+
+            if ((!this.isRendered()) || forceRerender) {
+                this._didRender         = false;
+                this._reactUIInstance   = null;
+
+                success = this._render();
+            } else {
+                _l.warn(me, "View already rendered, not re-rendering view");
+            }
+
+            return success;
+        },
+
+        isRendered : function() {
+            return this._didRender;
         },
 
         allowedToRegister : function(component) {
@@ -99,7 +148,7 @@
          *
          *********************************************************************/
         _setup : function() {
-            var me      = "{0}::Controller::_setup".fmt(this.getIName());
+            var me      = "{0}::View::_setup".fmt(this.getIName());
             var success = false;
 
             _l.error(me, "No implementation given, don't know how to setup this view");
@@ -111,6 +160,38 @@
             if (_.call(processor, 'isController', processorName) === true) {
                 this._controller = processor;
             }
+        },
+
+        /**
+         *
+         * Actual view rendering implementation that needs to be implemented by subview.
+         *
+         * @returns {boolean} True is initiation of rendering was successful
+         *
+         * @protected
+         */
+        _render : function() {
+            var me = "{0}::View::_render".fmt(this.getIName());
+            _l.error(me, "No implementation, unable to render view");
+            _l.info(me, "Implement this method in your subclass in order to render the view");
+
+            return false;
+        },
+
+        _onViewRendered : function() {
+            var me = "{0}::View::_onViewRendered".fmt(this.getIName());
+            _l.debug(me, "View rendered");
+
+            this._didRender = true;
+
+            this._readyToProcessEvents();
+
+            this._onRendered();
+        },
+
+        _onRendered : function() {
+            var me = "{0}::View::_onRendered".fmt(this.getIName());
+            _l.debug(me, "Not implemented, nothing to do");
         },
 
         /**
