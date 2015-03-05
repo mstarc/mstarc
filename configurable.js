@@ -42,7 +42,7 @@
          *
          */
         _addConfigProperties : function(config) {
-            var me = "[{0}]Configurable::_addConfigProperties".fmt(_.call(this, 'getIName') || '[UNKOWN]');
+            var me = "[{0}]Configurable::_addConfigProperties".fmt(_.exec(this, 'getIName') || '[UNKOWN]');
 
             if (!_.obj(config)) {
                 //Nothing to do

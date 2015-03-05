@@ -75,9 +75,9 @@
         },
 
         allowedToRegister : function(component) {
-            var compName = _.call(component, 'getIName') || "[UNKNOWN]";
+            var compName = _.exec(component, 'getIName') || "[UNKNOWN]";
 
-            return (_.call(component, 'isController', compName) === true);
+            return (_.exec(component, 'isController', compName) === true);
         },
 
         /**

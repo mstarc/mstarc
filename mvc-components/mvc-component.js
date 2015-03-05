@@ -5,16 +5,16 @@
 (function() {
 
     //Add to Visionscapers namespace
-    var NS              = window.__VI__ || window;
+    var NS                  = window.__VI__ || window;
 
     var _                   = NS.utils;
     var _l                  = NS.logger;
     var Class               = window.jsface.Class;
     var NamedBase           = NS.NamedBase;
     var Configurable        = NS.Configurable;
-    var DispatchesEvent     = NS.DispatchesEvent;
+    var DispatchesEvents    = NS.DispatchesEvents;
 
-    NS.MVCComponent = Class([NamedBase, Configurable, DispatchesEvent], {
+    NS.MVCComponent = Class([NamedBase, Configurable, DispatchesEvents], {
 
         $statics : {
             REQUIRED_COMPONENT_CONNECT_API : {
@@ -215,7 +215,7 @@
                 processorName = processorNames[idx];
                 processor     = this._processors[processorName];
 
-                count += ((_.call(processor, typeAssessor, processorName) === true) ? 1 : 0);
+                count += ((_.exec(processor, typeAssessor, processorName) === true) ? 1 : 0);
             }
 
             return count;

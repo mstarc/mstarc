@@ -93,7 +93,7 @@
                 forceRerender = false;
             }
 
-            if (this.isValid()) {
+            if (!this.isValid()) {
                 _l.error(me, "View not valid, unable to render");
                 return success
             }
@@ -118,9 +118,9 @@
             var me              = "{0}::View::allowedToRegister".fmt(this.getIName());
             var allowed         = false;
 
-            var componentName   = _.call(component, "getIName") || "[UNKNOWN]";
+            var componentName   = _.exec(component, "getIName") || "[UNKNOWN]";
 
-            if (_.call(component, 'isController', componentName) === true) {
+            if (_.exec(component, 'isController', componentName) === true) {
                 if (this._countRegisteredOfType("controller") < 1) {
                     allowed = true;
                 } else {
@@ -157,7 +157,7 @@
         },
 
         _didRegister : function(processorName, processor) {
-            if (_.call(processor, 'isController', processorName) === true) {
+            if (_.exec(processor, 'isController', processorName) === true) {
                 this._controller = processor;
             }
         },

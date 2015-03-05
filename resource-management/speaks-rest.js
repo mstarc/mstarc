@@ -20,7 +20,7 @@
      *
      * Choices are made, limiting the way you can make requests, staying close to a RESTful API design.
      *
-     * The mixin assumes that the HTTP API client instance is available as this.httpAPI.
+     * The mixin assumes that the HTTP API client instance is available as this._httpAPI.
      * This client instance must expose a request() method with the following signature:
      *
      * request(method, resourcePath, data, responseCb)
@@ -316,7 +316,7 @@
                 return success;
             }
 
-            return this.httpAPI.request(action, path, data, resultCb);
+            return this._httpAPI.request(action, path, data, resultCb);
         },
 
         _getAPIPath : function(resourceID, relatedResourcePath) {
@@ -327,7 +327,7 @@
                 return !_.empty(path);
             };
 
-            var path    = _.joinPaths([this.resourceName, "/"]);
+            var path    = _.joinPaths([this._resourceName, "/"]);
 
             path        = _.joinPaths([path, (__valid(resourceID) ? _.joinPaths([resourceID, "/"]) : "")]);
             path        = _.joinPaths([path, (__valid(relatedResourcePath) ? relatedResourcePath : "")]);

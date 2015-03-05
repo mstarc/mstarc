@@ -13,8 +13,8 @@
 
     NS.DispatchesEvents = Class({
 
-        _processors          : {},
-        _processorsIndex     : {},
+        _processors          : null,
+        _processorsIndex     : null,
 
         /**
          *
@@ -24,7 +24,7 @@
          * @protected
          *
          */
-        _throttleTimers  : {},
+        _throttleTimers     : null,
 
         /**
          *
@@ -87,9 +87,12 @@
          *
          */
         register : function(processorName, processor) {
-            var instanceName = _.call(this, 'getIName') || '[UNKOWN]';
+            var instanceName = _.exec(this, 'getIName') || '[UNKOWN]';
             var me = "[{0}]::DispatchesEvents::register".fmt(instanceName);
             var success = false;
+
+            this._processors        = this._processors || {};
+            this._processorsIndex   = this._processorsIndex || {};
 
             if (!_.string(processorName)) {
                 _l.error(me, "No processor name given, unable to register");
@@ -102,20 +105,23 @@
             }
 
             if (_.def(this._processors[processorName])) {
-                _l.error(me, "A processor with name [{0}] already registered, unable to register");
+                _l.error(me, "A processor with name [{0}] already registered, unable to register".fmt(processorName));
                 return success;
             }
 
             if (!this.allowedToRegister(processor)) {
-                _l.error(me, "It is not allowed to register processor [{0}], unable to register");
+                _l.error(me, "It is not allowed to register processor [{0}], unable to register".fmt(processorName));
                 return success;
             }
 
-            _l.info("Registering [{0}]".fmt(processorName));
+            _l.info(me, "Registering [{0}]".fmt(processorName));
 
-            success = true;
             this._processors[processorName] = processor;
             this._processorsIndex[processor] = processorName;
+
+            this._didRegister(processorName, processor);
+
+            return (success = true);
         },
 
         /**
@@ -134,6 +140,9 @@
             var me = "[{0}]::DispatchesEvents::deregister".fmt(instanceName);
             var success = false;
 
+            this._processors        = this._processors || {};
+            this._processorsIndex   = this._processorsIndex || {};
+
             if (!_.obj(processor)) {
                 _l.error(me, "No processor instance given, unable to deregister");
                 return success;
@@ -145,7 +154,7 @@
                 return success;
             }
 
-            _l.info("Deregistering [{0}]".fmt(processorName));
+            _l.info(me, "Deregistering [{0}]".fmt(processorName));
 
             success = true;
             delete this._processors[processorName];
@@ -158,8 +167,8 @@
         },
 
         destroy : function() {
-            this._processors = {};
-            this._processorsIndex = {};
+            this._processors        = null;
+            this._processorsIndex   = null;
         },
 
         /***************************************************
@@ -196,6 +205,8 @@
         _dispatch : function(eventName, eventData, cbEventProcessed) {
             //var me      = "[{0}]::DispatchesEvents::_dispatch".fmt(_.call(this, 'getIName') || '[UNKOWN]');
             var self    = this;
+
+            this._processors = this._processors || {};
 
             cbEventProcessed = _.ensureFunc(cbEventProcessed);
 
@@ -236,6 +247,8 @@
         _dispatchThrottled : function(eventName, eventData, cbEventProcessed, throttleDelay) {
             //var me      = "[{0}]::DispatchesEvents::_dispatchThrottled".fmt(_.call(this, 'getIName') || '[UNKOWN]');
 
+            this._processors = this._processors || {};
+
             for (var processor in this._processors) {
                 if (_.obj(processor)) {
                     this._scheduleEventDispatch(processor, eventName, eventData, cbEventProcessed, throttleDelay);
@@ -268,6 +281,8 @@
         _dispatchEvent : function(processor, eventName, eventData, eventProcessedCb) {
             var success = false;
 
+            this._processorsIndex   = this._processorsIndex || {};
+
             if (!_.hasMethod(processor, 'processEvent')) {
                 var iName           = _.call(this, 'getIName') || "[UNKOWN]";
                 var me              = "{0}::DispatchesEvents::_dispatchEvent".fmt(iName);
@@ -295,8 +310,11 @@
          * @protected
          */
         _scheduleEventDispatch : function(processor, eventName, eventData, eventProcessedCb, throttleDelay) {
-            var success = false;
-            var self    = this;
+            var success             = false;
+            var self                = this;
+
+            this._processorsIndex   = this._processorsIndex || {};
+            this._throttleTimers    = this._throttleTimers || {};
 
             if ((!_.number(throttleDelay)) || (throttleDelay < 0)) {
                 throttleDelay = 300;

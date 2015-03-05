@@ -18,7 +18,8 @@
         /**
          *
          * CanShowUI Mixin. Adds a public method showUI.
-         * This method assumes a _DOMContainer HTML element
+         * This method assumes a _DOMContainer HTML element and a 'visible' class
+         * that enables the container to be shown when added.
          *
          * @class   CanShowUI
          * @module  M*C

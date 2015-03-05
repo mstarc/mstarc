@@ -19,13 +19,12 @@
 
         $statics : {
             REQUIRED_REACT_API : {
-                methods : ['createElement', 'render'],
-                properties : ['ReactClass']
+                methods : ['createElement', 'render']
             },
 
-            REQUIRED_REACT_CLASS_API : {
+            /*REQUIRED_REACT_CLASS_API : {
                 methods : ['mountComponent', 'receiveComponent']
-            },
+            },*/
 
             createReactElement : function(type, config, children) {
                 return React.createElement(type, config, children);
@@ -146,11 +145,8 @@
                 errorOccurred = true;
             }
 
-            if (!_.interfaceAdheres(this._reactUIClass, NS.ReactView.REQUIRED_REACT_CLASS_API)) {
-                _l.error(me, "Unable to setup React view, " +
-                             "ReactClass does not adhere to required interface");
-                _l.info(me, "Required ReactClass API is : ", _.stringify(NS.ReactView.REQUIRED_REACT_CLASS_API));
-
+            if (!_.class(this._reactUIClass)) {
+                _l.error(me, "Unable to setup React view, ReactClass is not a Class");
                 errorOccurred = true;
             }
 
@@ -185,15 +181,26 @@
             }
 
             this._reactUIInstance = React.render(this._reactUIElement, this._DOMContainer, function() {
-                self._renderState();
-                self._onViewRendered();
+                //Make async because the rendering seems to be a synchronous process such that
+                // this callback is called before returning the react UI instance
+                setTimeout(function() {
+                    self._renderState();
+                    self._onViewRendered();
+                }, 0);
             });
 
             return (success = true);
         },
 
         _renderState : function() {
-            this._getReactUIInstance().setState(this._state);
+            var me = "{0}::ReactView::_renderState".fmt(this.getIName());
+
+            var ui = this._getReactUIInstance();
+            if (_.hasMethod(ui, "setState", "React UI Instance")) {
+                ui.setState(this._state);
+            } else {
+                _l.error(me, "No valid React UI instance available, unable to render state");
+            }
         },
 
         _createReactUIElement : function(reactUIClass) {

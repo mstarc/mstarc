@@ -16,6 +16,8 @@
 
     NS.ResourceManager = Class([NamedBase, Configurable], {
 
+        _dataAPIs : null,
+
         /**
          *
          * TO BE FURTHER DEVELOPED
@@ -64,7 +66,11 @@
             var managerName = _.capitaliseFirst(resourceName || 'UnknownResource') + "ResourceManager";
             NS.ResourceManager.$super.call(this, managerName, config);
 
-            var me = "{0}::Resource::constructor".fmt(this.getIName());
+            var me = "{0}::ResourceManager::constructor".fmt(this.getIName());
+
+            this._addConfigProperties(config);
+
+            this._valid         = true;
 
             this._resourceName  = resourceName;
             if ((!_.string(resourceName)) || (_.empty(resourceName))) {
@@ -73,6 +79,7 @@
                 return;
             }
 
+            this._dataAPIs = dataAPIs;
             if (!this._setup()) {
                 _l.error(me, "ResourceManager setup failed, resource manager wil not function properly");
                 this._valid = false;

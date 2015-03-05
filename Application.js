@@ -21,7 +21,7 @@
 
         $statics : {
             REQUIRED_STATE_MANAGER_API : {
-                methods : ['sendEvent', 'goToState']
+                methods : ['sendEvent']
             }
         },
 
@@ -45,7 +45,7 @@
          *                                          This method is called during construction
          *
          *  - start()                               Called when you want to start the application. The default
-         *                                          implementation uses the state manager to go to state 'app-ready'
+         *                                          implementation uses the state manager to sendEvent 'appReady'
          *
          *
          * @class           Application
@@ -76,11 +76,12 @@
          *
          */
         constructor: function(applicationName, stateManager, config) {
-            NS.Controller.$super.call(this, applicationName, config);
+            NS.Application.$super.call(this, applicationName, config);
 
             var me = "{0}::Application::constructor".fmt(this.getIName());
 
             this._stateManager = stateManager;
+            this._addConfigProperties(config);
 
             this._valid = true;
             if (!this._setup()) {
@@ -98,7 +99,7 @@
                 return success;
             }
 
-            this._stateManager.goToState('app-ready');
+            this._stateManager.sendEvent('appReady');
         },
 
         /**
@@ -149,7 +150,7 @@
             constructorArgs.unshift(componentName);
 
             //A way to construct using call
-            var factoryFunction = mvcComponentClass.bind.call(mvcComponentClass, constructorArgs);
+            var factoryFunction = mvcComponentClass.bind.apply(mvcComponentClass, constructorArgs);
             component           = new factoryFunction();
 
             this._MVCComponents[componentName] = component;
@@ -204,12 +205,12 @@
             var me      = "{0}::Application::_setup".fmt(this.getIName());
             var success = false;
 
-            if (_.interfaceAdheres(this._stateManager, NS.Controller.REQUIRED_STATE_MANAGER_API)) {
+            if (_.interfaceAdheres(this._stateManager, NS.Application.REQUIRED_STATE_MANAGER_API)) {
                 success = true;
             } else {
                 _l.error(me, "Statemanager does not adhere to required interface");
                 _l.info(me, "Statemanager must adhere to following interface definition",
-                        NS.Controller.REQUIRED_STATE_MANAGER_API);
+                        _.stringify(NS.Application.REQUIRED_STATE_MANAGER_API));
             }
 
             return success;

@@ -22,6 +22,8 @@
             }
         },
 
+        _httpAPI : null,
+
 
         /**
          *
@@ -64,10 +66,11 @@
             var me      = "{0}::SimpleResourceManager::_setup".fmt(this.getIName());
             var success = true;
 
-            this.httpAPI = _.get(this.dataAPIs, 'httpAPI');
-            if (!_.interfaceAdheres(this.httpAPI, SimpleResourceManager.REQUIRED_HTTP_API_CLIENT_API)) {
+            this._httpAPI = _.get(this._dataAPIs, 'httpAPI');
+            if (!_.interfaceAdheres(this._httpAPI, SimpleResourceManager.REQUIRED_HTTP_API_CLIENT_API)) {
                 _l.error(me, "No valid HTTP API Client given, resource manager will not function");
-                _l.info(me, "Required API for HTTP API is : ", SimpleResourceManager.REQUIRED_HTTP_API_CLIENT_API);
+                _l.info(me, "Required API for HTTP API is : ",
+                        _.stringify(SimpleResourceManager.REQUIRED_HTTP_API_CLIENT_API));
 
                 success = false;
             }

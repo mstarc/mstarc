@@ -77,7 +77,7 @@
             var me = "Controller::constructor";
             NS.Controller.$super.call(this, controllerName, config);
 
-            this._stateManager          = stateManager;
+            this._stateManager = stateManager;
 
             this._valid = true;
             if (!this._setup()) {
@@ -90,9 +90,9 @@
             var me              = "{0}::Controller::allowedToRegister".fmt(this.getIName());
             var allowed         = false;
 
-            var componentName   = _.call(component, "getIName") || "[UNKNOWN]";
+            var componentName   = _.exec(component, "getIName") || "[UNKNOWN]";
 
-            if (_.call(component, 'isView', componentName) === true) {
+            if (_.exec(component, 'isView', componentName) === true) {
                 if (this._countRegisteredOfType("view") < 1) {
                     allowed = true;
                 } else {
@@ -103,7 +103,7 @@
                 return allowed;
             }
 
-            if (_.call(component, 'isModel', componentName) === true) {
+            if (_.exec(component, 'isModel', componentName) === true) {
                 if (this._countRegisteredOfType("model") < 1) {
                     allowed = true;
                 } else {
@@ -127,6 +127,17 @@
             return true;
         },
 
+        showUI : function() {
+            var me      = "HomeController::showUI";
+
+            if (!this.isValid()) {
+                _l.error(me, "Controller not valid, unable to process showUI.");
+                return;
+            }
+
+            this._dispatchToView("showUI");
+        },
+
         /*********************************************************************
          *
          * PROTECTED METHODS
@@ -142,16 +153,16 @@
             } else {
                 _l.error(me, "Statemanager does not adhere to required interface");
                 _l.info(me, "Statemanager must adhere to following interface definition",
-                        NS.Controller.REQUIRED_STATE_MANAGER_API);
+                        _.stringify(NS.Controller.REQUIRED_STATE_MANAGER_API));
             }
 
             return success;
         },
 
         _didRegister : function(processorName, processor) {
-            if (_.call(processor, 'isModel', processorName) === true) {
+            if (_.exec(processor, 'isModel', processorName) === true) {
                 this._model = processor;
-            } else if (_.call(processor, 'isView', processorName) === true) {
+            } else if (_.exec(processor, 'isView', processorName) === true) {
                 this._view = processor;
             }
         },
@@ -159,7 +170,7 @@
         /**
          *
          * @param eventName
-         * @param eventData
+         * @param [eventData]
          * @param [eventProcessedCb]
          * @param {boolean} [throttle = false]      dispatch will be throttled if true
          * @param {number} [throttleDelay]          Optional custom throttleDelay, relevant when throttled = true
@@ -187,7 +198,7 @@
         /**
          *
          * @param eventName
-         * @param eventData
+         * @param [eventData]
          * @param [eventProcessedCb]
          * @param {boolean} [throttle = false]      dispatch will be throttled if true
          * @param {number} [throttleDelay]          Optional custom throttleDelay, relevant when throttled = true

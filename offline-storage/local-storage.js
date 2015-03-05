@@ -65,7 +65,7 @@
             try {
                 str = JSON.stringify(value);
             } catch(e) {
-                _l.error(me, "A problem occurred stringify : ", e);
+                _l.error(me, "A problem occurred stringify : ", _.stringify(e));
             }
 
             return str;
@@ -81,22 +81,21 @@
             var obj = null;
 
             if (!_.string(packedValue)) {
-                _l.error(me, "Packed value is a string, unable to unpack value");
+                _l.debug(me, "Packed value is not a string, unable to unpack value");
                 return obj;
             }
 
             try {
                 obj = JSON.parse(packedValue);
             } catch(e) {
-                _l.error(me, "A problem occurred parsing the packed value, unable to unpack");
+                _l.error(me, "A problem occurred parsing the packed value, unable to unpack : ", _.stringify(e));
             }
 
             return obj;
         },
 
         _retrieve : function(key) {
-            localStorage.getItem(key);
-            return true;
+            return localStorage.getItem(key);
         },
 
         _remove : function(key) {
