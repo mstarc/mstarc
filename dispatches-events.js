@@ -216,7 +216,9 @@
                 });
             };
 
-            for (var processor in this._processors) {
+            var processor = null;
+            for (var processorName in this._processors) {
+                processor = this._processors[processorName];
                 if (_.obj(processor)) { __doDispatch(processor); }
             }
         },
@@ -249,7 +251,9 @@
 
             this._processors = this._processors || {};
 
-            for (var processor in this._processors) {
+            var processor = null;
+            for (var processorName in this._processors) {
+                processor = this._processors[processorName];
                 if (_.obj(processor)) {
                     this._scheduleEventDispatch(processor, eventName, eventData, cbEventProcessed, throttleDelay);
                 }
