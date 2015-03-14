@@ -24,6 +24,8 @@
          * @class   CanShowUI
          * @module  M*C
          *
+         * @for     View
+         *
          */
 
         /**
@@ -32,7 +34,8 @@
          *
          */
         showUI : function(show) {
-            var me = "HomeView::showUI";
+            var iName           = _.call(this, 'getIName') || "[UNKOWN]";
+            var me              = "{0}::CanShowView::showUI".fmt(iName);
 
             if (!this.isValid()) {
                 _l.error(me, "View is not valid, unable to show UI");

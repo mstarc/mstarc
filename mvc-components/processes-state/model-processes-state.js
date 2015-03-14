@@ -27,8 +27,45 @@
          *
          * IMPORTANT : Call _initStateProcessing() during construction of your class that uses this mixin
          *
+         * *** TODO START : FUTURE : COMPLEX STATE ***
+         * Model state is always partitioned per **resource type** and per resource type you can have state for
+         * one or multiple resource instances. To explain this, for example, a library book lending
+         * UI might enable the user to view and edit 'user' info and info about 'books'. So it shows and
+         * and allows editing information of a user resource and multiple book resources.
+         * *** TODO END : FUTURE : COMPLEX STATE ***
          *
-         * State is structured as follows:
+         * This mixin defines and processes the following types of state:
+         *  * data state of properties
+         *  * sync state of properties
+         *  * global sync state
+         *  * error state of properties
+         *  * global error state
+         *  * validity state of properties
+         *
+         * The mixin exposes only two public method to edit and sync the data state:
+         *
+         *  edit(property, value, editProcessedCb)
+         *  sync(syncReadyCb)
+         *
+         * When the edit method is called, not only is the data <property> set to <value>, also the value is validated
+         * if validation has been implemented for the property using a method with the following naming convention:
+         *
+         *  validateProperty<Property>(value)
+         *
+         * TODO : Complex state syncing
+         * Further, the global sync state is set to NOT_SYNCED when the new value for the property is
+         * different from the old value. To assess if two property values are equal it will use a custom method if
+         * available, using the following naming convention:
+         *
+         *  isEqual<Property>(val1, val2)
+         *
+         * When the sync() method is called it is checked if globalSyncing is NOT_SYNCED.
+         * If so, the _sync(syncReadyCb) method is called. This method needs to be overridden by the class
+         * that uses this mixin and implements the actual syncing. When the syncReadyCb(err) callback is called
+         * without error the globalSyncing is set to SYNCED.
+         *
+         *
+         * Internally the state is structured as follows:
          * {
          *      // The actual state property values.
          *      data : {
@@ -85,7 +122,8 @@
          * _updateDataState(property, value, updateProcessedCb)
          *
          * _updateGlobalSyncState(syncValue, updateProcessedCb)
-         * _updateSyncState(property, sync_value, updateProcessedCb)
+         * //TODO : complex state
+         * //_updateSyncState(property, sync_value, updateProcessedCb)
          *
          * _updateGlobalErrorState(errorValue, updateProcessedCb)
          * _updateErrorState(property, errorValue, updateProcessedCb)
@@ -100,7 +138,8 @@
          * _dataStateUpdatedFor<Property>(value)
          *
          * _globalSyncStateUpdated(value)
-         * _syncStateUpdatedFor<Property>(value)
+         * //TODO : complex state
+         * //_syncStateUpdatedFor<Property>(value)
          *
          * _globalErrorStateUpdated(value)
          * _errorStateUpdatedFor<Property>(value)
@@ -124,6 +163,116 @@
          *
          */
 
+        /**
+         *
+         * Edit data <property> by setting it to a new <value>
+         *
+         * @param property          property for which to edit a value
+         * @param value             New value for property
+         * @param editProcessedCb   function(err), callback called when the edit has been processed throughout
+         *                          the whole MVC
+         *
+         * returns {boolean}        True if initiation of the edit was successful, false otherwise
+         *
+         */
+        edit : function(property, value, editProcessedCb) {
+            var iName           = _.call(this, 'getIName') || "[UNKOWN]";
+            var me              = "{0}::ModelProcessesState::edit".fmt(iName);
+
+            editProcessedCb     = _.ensureFunc(editProcessedCb);
+
+            var finalError      = null;
+            var errHash         = null;
+
+            var dataUpdating    = false;
+
+            //Update Data State Callback called
+            var udsCbCalled    = false;
+            //Parallel tasks callback called
+            var ptCbCalled      = false;
+
+            var finalCbCalled   = false;
+
+            var __callback  = function() {
+                if (dataUpdating && !(udsCbCalled && ptCbCalled)) {
+                    return;
+                }
+
+                if (!finalCbCalled) {
+                    finalCbCalled = true;
+                } else {
+                    _l.error(me, "UNEXPECTED : Callback already called, will not call again");
+                    return;
+                }
+
+                if (_.obj(errHash)) {
+                    finalError = {
+                        message : "One or more errors occurred editing property {0}".fmt(property),
+                        originalError : {
+                            error_hash : errHash
+                        }
+                    };
+                }
+
+                editProcessedCb(finalError);
+            };
+
+            var __dataStateUpdatedCb = function(_err) {
+                udsCbCalled = true;
+
+                if (_.def(_err)) {
+                    errHash = errHash || {};
+                    errHash["update global sync state"] = _err;
+                }
+
+                __callback();
+            };
+
+            var __parallelTasksCb = function(_err) {
+                ptCbCalled = true;
+
+                if (_.def(_err)) {
+                    errHash = errHash || {};
+
+                    errHash["update validity of property {0}".fmt(property)] = {
+                        error_hash : _err
+                    };
+                }
+
+                __callback();
+            };
+
+            dataUpdating = this._updateDataState(property, value, __dataStateUpdatedCb);
+            if (dataUpdating) {
+
+                var parallelTasks = {};
+
+                parallelTasks["update global sync state"] = function(cbReady) {
+                    if (!this._updateGlobalSyncState(SyncState.NOT_SYNCED, cbReady)) {
+                        cbReady();
+                    }
+                };
+
+                parallelTasks["update validity of property {0}".fmt(property)] = function(cbReady) {
+                    var validity = this._callCustomMethod("validateProperty", property, value);
+                    if (!this._updateValidityState(property, validity, cbReady)) {
+                        cbReady();
+                    }
+                };
+
+                _.execASync(parallelTasks, __parallelTasksCb)
+
+            } else {
+                __callback();
+            }
+
+            return dataUpdating;
+        },
+
+        sync : function(syncCb) {
+
+        },
+
         /*********************************************************************
          *
          * PROTECTED METHODS
@@ -146,7 +295,6 @@
 
             this._stateInitialized = true;
         },
-
 
         /**
          *
@@ -181,6 +329,10 @@
 
             if (!_.string(property) || _.empty(property)) {
                 _l.error(me, "Property is not valid, unable to update data state and notify controllers");
+                return success;
+            }
+
+            if (this._isEqual(property, this._state.data[property], value)) {
                 return success;
             }
 
@@ -222,6 +374,10 @@
                 return success;
             }
 
+            if (_.equals(this._state.globalSyncing, value)) {
+                return success;
+            }
+
             this._state.globalSyncing = value;
 
             success = this._callCustomMethod("globalSyncStateUpdated", "", value);
@@ -230,6 +386,7 @@
             return success;
         },
 
+        //TODO : complex state
         /**
          *
          * Updates the sync state of <property> to <value> and notifies connected controllers that it is updated.
@@ -250,7 +407,7 @@
          * @protected
          *
          */
-        _updateSyncState : function(property, value, updateProcessedCb) {
+        /*_updateSyncState : function(property, value, updateProcessedCb) {
             var iName   = _.call(this, 'getIName') || "[UNKOWN]";
             var me      = "{0}::ModelProcessesState::_updateSyncState".fmt(iName);
             var self    = this;
@@ -292,8 +449,9 @@
             }) && success;
 
             return success;
-        },
+        },*/
 
+        //TODO : complex state
         /**
          *
          * Calculates "most severe" sync state among all property sync states.
@@ -302,7 +460,7 @@
          *
          * @protected
          */
-        _calcGlobalSyncState : function() {
+        /*_calcGlobalSyncState : function() {
             var iName   = _.call(this, 'getIName') || "[UNKOWN]";
             var me      = "{0}::ModelProcessesState::_calcGlobalSyncState".fmt(iName);
 
@@ -332,7 +490,7 @@
             }
 
             return globalSyncState;
-        },
+        },*/
 
         /**
          *
@@ -357,6 +515,10 @@
 
             if (!this._stateInitialized) {
                 _l.error(me, "State object is not initialized, call _initStateProcessing() in your constructor first");
+                return success;
+            }
+
+            if (_.equals(this._state.globalError, value)) {
                 return success;
             }
 
@@ -405,6 +567,10 @@
             }
 
             updateProcessedCb = _.ensureFunc(updateProcessedCb);
+
+            if (_.equals(this._state.error[property], value)) {
+                return success;
+            }
 
             this._state.error[property] = value;
 
@@ -507,6 +673,10 @@
                 return success;
             }
 
+            if (_.equals(this._state.validity[property], value)) {
+                return success;
+            }
+
             this._state.validity[property] = value;
 
             success = this._callCustomMethod("_validityStateUpdatedFor", property, value);
@@ -518,10 +688,35 @@
             return success;
         },
 
+        _isEqual : function(property, oldVal, newVal) {
+            var isEqual = false;
+
+            var customFuncName  = this._getCustomMethodName("_isEqual", property);
+            var customFunc      = this[customFuncName];
+            if (_.func(customFunc)) {
+                isEqual = customFunc(oldVal, newVal);
+                if (!_.bool(isEqual)) {
+                    var iName   = _.call(this, 'getIName') || "[UNKOWN]";
+                    var me      = "{0}::ModelProcessesState::_isEqual".fmt(iName);
+
+                    _l.error(me, ("Custom method {0} did not return a " +
+                                  "boolean equality value").fmt(customFuncName));
+                }
+
+                return isEqual;
+            }
+
+            return (isEqual = _.equals(oldVal, newVal));
+        },
+
+        _getCustomMethodName : function(methodPrefix, property) {
+            return methodPrefix + _.capitaliseFirst(property);
+        },
+
         _callCustomMethod : function(methodPrefix, property, value) {
             var success         = true;
 
-            var customFuncName  = methodPrefix+property;
+            var customFuncName  = this._getCustomMethodName(methodPrefix, property);
             var customFunc      = this[customFuncName];
             if (_.func(customFunc)) {
                 success = customFunc.call(this, value);
@@ -530,7 +725,7 @@
                     var me      = "{0}::ModelProcessesState::_callCustomMethod".fmt(iName);
 
                     _l.warn(me, ("Custom method {0} did not return a " +
-                                 "boolean success value, setting to true").fmt(customFuncName));
+                                 "boolean success value").fmt(customFuncName));
 
                     success = true;
                 }
