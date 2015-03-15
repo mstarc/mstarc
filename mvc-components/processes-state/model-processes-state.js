@@ -5,14 +5,15 @@
 (function() {
 
     //Add to Visionscapers namespace
-    var NS          = window.__VI__ || window;
+    var NS              = window.__VI__ || window;
 
-    var _           = NS.utils;
-    var _l          = NS.logger;
+    var _               = NS.utils;
+    var _l              = NS.logger;
 
-    var Class       = window.jsface.Class;
+    var Class           = window.jsface.Class;
 
-    var SyncState   = NS.SyncState;
+    var SyncState       = NS.SyncState;
+    var SyncStateName   = NS.SyncStateName;
 
     NS.ModelProcessesState = Class({
 
@@ -26,6 +27,17 @@
          *
          *
          * IMPORTANT : Call _initStateProcessing() during construction of your class that uses this mixin
+         *
+         *
+         * IMPORTANT : Almost all methods, including custom methods, have the following form:
+         *
+         *  actionInitiationSuccess = aMethod(property, value, callback);
+         *      or
+         *  actionInitiationSuccess = aMethod(value, callback);
+         *
+         * When actionInitiationSuccess is false the callback WILL NEVER be called.
+         * Only when true is the callback ALWAYS called.
+         *
          *
          * *** TODO START : FUTURE : COMPLEX STATE ***
          * Model state is always partitioned per **resource type** and per resource type you can have state for
@@ -84,8 +96,8 @@
          *          <prop_N> : <unknown || sync_error || not_synced || syncing || synced || null>
          *      },
          *
-         *      //overall error state. How many properties have errors?
-         *      globalError : <number>,
+         *      //overall error state
+         *      globalError : <List of properties that have errors || null>,
          *
          *      // Error object for any state property that has an error
          *      error : {
@@ -93,6 +105,9 @@
          *          ...
          *          <prop_N> : <prop_N_error_object || boolean || null>
          *      },
+         *
+         *      //overall validity state
+         *      globalValidity : <List of properties that are invalid || null>,
          *
          *      //Validity for each property
          *      validity : {
@@ -144,6 +159,7 @@
          * _globalErrorStateUpdated(value)
          * _errorStateUpdatedFor<Property>(value)
          *
+         * _globalValidityStateUpdated(value)
          * _validityStateUpdatedFor<Property>(value)
          *
          * These custom method must return an a success boolean value.
@@ -181,13 +197,18 @@
 
             editProcessedCb     = _.ensureFunc(editProcessedCb);
 
+            if (_.exec(this, "isValid") === false) {
+                _l.error(me, "Model is invalid, unable to edit");
+                return false;
+            }
+
             var finalError      = null;
             var errHash         = null;
 
             var dataUpdating    = false;
 
             //Update Data State Callback called
-            var udsCbCalled    = false;
+            var udsCbCalled     = false;
             //Parallel tasks callback called
             var ptCbCalled      = false;
 
@@ -249,14 +270,18 @@
 
                 parallelTasks["update global sync state"] = function(cbReady) {
                     if (!this._updateGlobalSyncState(SyncState.NOT_SYNCED, cbReady)) {
-                        cbReady();
+                        cbReady({
+                            message : "Problem initiating _updateGlobalSyncState"
+                        });
                     }
                 };
 
                 parallelTasks["update validity of property {0}".fmt(property)] = function(cbReady) {
-                    var validity = this._callCustomMethod("validateProperty", property, value);
+                    var validity = this._callCustomMethod("validateProperty", property, value, false);
                     if (!this._updateValidityState(property, validity, cbReady)) {
-                        cbReady();
+                        cbReady({
+                            message : "Problem initiating _updateValidityState"
+                        });
                     }
                 };
 
@@ -270,7 +295,56 @@
         },
 
         sync : function(syncCb) {
+            var iName           = _.call(this, 'getIName') || "[UNKOWN]";
+            var me              = "{0}::ModelProcessesState::edit".fmt(iName);
+            var self            = this;
 
+            var syncingStarted  = false;
+
+            syncCb              = _.ensureFunc(syncCb);
+
+            if (_.exec(this, "isValid") === false) {
+                _l.error(me, "Model is invalid, unable to sync");
+                return syncingStarted;
+            }
+
+            if (!this._stateInitialized) {
+                _l.error(me, "State object is not initialized, call _initStateProcessing() in your constructor first");
+                return syncingStarted;
+            }
+
+            var validityState = this._state.globalValidity;
+            if (!_.empty(validityState)) {
+                _l.warn(me, "The following properties are invalid, unable to sync: {0}".fmt(validityState));
+                return syncingStarted;
+            }
+
+            var syncState = this._state.globalSyncing;
+            if (syncState > SyncState.NOT_SYNCED) {
+                _l.info(me, "Syncing not required, global sync state is : {0}".fmt(SyncStateName[syncState]));
+
+                //Do in next runloop
+                setTimeout(syncCb, 0);
+
+                return (syncingStarted = true);
+            }
+
+            syncingStarted = this._sync(function(err) {
+                if (_.def(err)) {
+                    syncCb(err);
+                    return;
+                }
+
+                self._updateGlobalSyncState(SyncState.SYNCED, syncCb);
+            });
+
+            if (!syncingStarted) {
+                syncCb({
+                    message : "A problem occurred syncing, data was not synced"
+                });
+            }
+
+            return syncingStarted;
         },
 
         /*********************************************************************
@@ -287,19 +361,34 @@
                 globalSyncing   : SyncState.UNKNOWN,
                 syncing         : {},
 
-                globalError     : -1,
+                globalError     : null,
                 error           : {},
 
+                globalValidity  : null,
                 validity        : {}
             };
 
             this._stateInitialized = true;
         },
 
+        _sync : function(cbSynced) {
+            var iName   = _.call(this, 'getIName') || "[UNKOWN]";
+            var me      = "{0}::ModelProcessesState::_updateDataState".fmt(iName);
+
+            var success = false;
+
+            _l.error(me, "Method not implemented, please implement this method in your class");
+
+            return success;
+        },
+
         /**
          *
          * Updates the data state <property> to <value> and notifies connected controllers that it is updated.
-         * When the update is processed you can optionally use the updateProcessedCb(err) callback
+         * After updating the controllers, if it is defined, a custom method
+         * _updateDataStateFor<Property>(value, readyCb) is called.
+         *
+         * Only when both steps are completed the optional updateProcessedCb(updated, err) is called.
          *
          * This method sends a dataStateUpdated event to the controllers with the following data object:
          * {
@@ -309,7 +398,9 @@
          *
          * @param {string} property                 property that is updated
          * @param {*} value                         New value for the data state of <property>
-         * @param {function} [updateProcessedCb]    Callback called when update has been processed
+         * @param {function} [updateProcessedCb]    Callback(updated, err) called when update has been processed
+         *                                          When updated is false and err is not an object, no update was
+         *                                          performed because the value didn't change.
          *
          * @returns {boolean}                       True if update was initiated successfully, false otherwise.
          *
@@ -321,6 +412,10 @@
             var me      = "{0}::ModelProcessesState::_updateDataState".fmt(iName);
 
             var success = false;
+            var updated = false;
+            var err     = {
+                error_hash : {}
+            };
 
             if (!this._stateInitialized) {
                 _l.error(me, "State object is not initialized, call _initStateProcessing() in your constructor first");
@@ -332,18 +427,44 @@
                 return success;
             }
 
+            updateProcessedCb = _.ensureFunc(updateProcessedCb);
+
             if (this._isEqual(property, this._state.data[property], value)) {
-                return success;
+                _l.debug(me, "Value for property {0} did not change, nothing to update".fmt(property));
+                //In next runloop, callback without error but with updated = false
+                setTimeout(function() { updateProcessedCb(updated, err); }, 0);
+                return (success = true);
             }
 
             this._state.data[property] = value;
-
-            success = this._callCustomMethod("_updateDataStateFor", property, value);
+            updated = true;
 
             success = this._dispatchToControllers("dataStateUpdated", {
                 what : property,
                 data : value
-            }, updateProcessedCb) && success;
+            }, function(_err) {
+                if (_.def(_err)) {
+                    err.error_hash["dispatched dataStateUpdated to controllers"] = _err;
+                }
+
+                var result = this._callCustomMethod("_updateDataStateFor", property, value, function(_err) {
+                    if (_.def(_err)) {
+                        err.error_hash["calling custom method _updateDataStateFor {0}".fmt(property)] = _err;
+                    }
+
+                    updateProcessedCb(updated, !_.empty(err.error_hash) ? err : null);
+                });
+
+                if (!result.called) {
+                    updateProcessedCb(updated, !_.empty(err.error_hash) ? err : null);
+                } else if (result.result !== true) {
+                    err.error_hash["initiating custom method _updateDataStateFor {0}".fmt(property)] = {
+                        message : "A problem occurred initiating custom method"
+                    };
+
+                    updateProcessedCb(updated, err);
+                }
+            });
 
             return success;
         },
@@ -351,12 +472,17 @@
         /**
          *
          * Updates the global sync state to <value> and notifies connected controllers that it is updated.
-         * When the update is processed you can optionally use the updateProcessedCb(err) callback
+         * After updating the controllers, if it is defined, a custom method _globalSyncStateUpdated(value, readyCb)
+         * is called.
+         *
+         * Only when both steps are completed the optional updateProcessedCb(updated, err) is called.
          *
          * This method sends a globalSyncStateUpdated event to the controllers.
          *
          * @param {*} value                         New value for the global sync state
-         * @param {function} [updateProcessedCb]    Callback called when update has been processed
+         * @param {function} [updateProcessedCb]    Callback(updated, err) called when update has been processed
+         *                                          When updated is false and err is not an object, no update was
+         *                                          performed because the value didn't change.
          *
          * @returns {boolean}                       True if update was initiated successfully, false otherwise.
          *
@@ -368,20 +494,51 @@
             var me      = "{0}::ModelProcessesState::_updateGlobalSyncState".fmt(iName);
 
             var success = false;
+            var updated = false;
+            var err     = {
+                error_hash : {}
+            };
 
             if (!this._stateInitialized) {
                 _l.error(me, "State object is not initialized, call _initStateProcessing() in your constructor first");
                 return success;
             }
 
+            updateProcessedCb = _.ensureFunc(updateProcessedCb);
+
             if (_.equals(this._state.globalSyncing, value)) {
-                return success;
+                _l.debug(me, "Value for global sync state did not change, nothing to update");
+                //In next runloop, callback without error but with updated = false
+                setTimeout(function() { updateProcessedCb(updated); }, 0);
+                return (success = true);
             }
 
             this._state.globalSyncing = value;
+            updated = true;
 
-            success = this._callCustomMethod("globalSyncStateUpdated", "", value);
-            success = this._dispatchToControllers("globalSyncStateUpdated", value, updateProcessedCb) && success;
+            success = this._dispatchToControllers("globalSyncStateUpdated", value, function(_err) {
+                if (_.def(_err)) {
+                    err.error_hash["dispatched globalSyncStateUpdated to controllers"] = _err;
+                }
+
+                var result = this._callCustomMethod("_globalSyncStateUpdated", "", value, function(_err) {
+                    if (_.def(_err)) {
+                        err.error_hash["calling custom method _globalSyncStateUpdated"] = _err;
+                    }
+
+                    updateProcessedCb(updated, !_.empty(err.error_hash) ? err : null);
+                });
+
+                if (!result.called) {
+                    updateProcessedCb(updated, !_.empty(err.error_hash) ? err : null);
+                } else if (result.result !== false) {
+                    err.error_hash["initiating custom method _globalSyncStateUpdated"] = {
+                        message : "A problem occurred initiating custom method"
+                    };
+
+                    updateProcessedCb(updated, err);
+                }
+            });
 
             return success;
         },
@@ -390,7 +547,7 @@
         /**
          *
          * Updates the sync state of <property> to <value> and notifies connected controllers that it is updated.
-         * When the update is processed you can optionally use the updateProcessedCb(err) callback
+         * When the update is processed you can optionally use the updateProcessedCb(updated, err) callback
          *
          * This method sends a syncStateUpdated event to the controllers with the following data object:
          * {
@@ -400,7 +557,9 @@
          *
          * @param {string} property                 property that is updated
          * @param {*} value                         New value for the sync state of <property>
-         * @param {function} [updateProcessedCb]    Callback called when update has been processed
+         * @param {function} [updateProcessedCb]    Callback(updated, err) called when update has been processed
+         *                                          When updated is false and err is not an object, no update was
+         *                                          performed because the value didn't change.
          *
          * @returns {boolean}                       True if update was initiated successfully, false otherwise.
          *
@@ -495,12 +654,17 @@
         /**
          *
          * Updates the global error state to <value> and notifies connected controllers that it is updated.
-         * When the update is processed you can optionally use the updateProcessedCb(err) callback
+         * After updating the controllers, if it is defined, a custom method
+         * _globalErrorStateUpdated(value, readyCb) is called.
+         *
+         * Only when both steps are completed the optional updateProcessedCb(updated, err) is called.
          *
          * This method sends a globalErrorStateUpdated event to the controllers.
          *
          * @param {*} value                         New value of the global error state
-         * @param {function} [updateProcessedCb]    Callback called when update has been processed
+         * @param {function} [updateProcessedCb]    Callback(updated, err) called when update has been processed
+         *                                          When updated is false and err is not an object, no update was
+         *                                          performed because the value didn't change.
          *
          * @returns {boolean}                       True if update was initiated successfully, false otherwise.
          *
@@ -512,19 +676,51 @@
             var me      = "{0}::ModelProcessesState::_updateGlobalErrorState".fmt(iName);
 
             var success = false;
+            var updated = false;
+            var err     = {
+                error_hash : {}
+            };
 
             if (!this._stateInitialized) {
                 _l.error(me, "State object is not initialized, call _initStateProcessing() in your constructor first");
                 return success;
             }
 
+            updateProcessedCb = _.ensureFunc(updateProcessedCb);
+
             if (_.equals(this._state.globalError, value)) {
-                return success;
+                _l.debug(me, "Value for global error state did not change, nothing to update");
+                //In next runloop, callback without error but with updated = false
+                setTimeout(function() { updateProcessedCb(updated); }, 0);
+                return (success = true);
             }
 
             this._state.globalError = value;
-            success = this._callCustomMethod("_globalErrorStateUpdated", "", value);
-            success = this._dispatchToControllers("globalErrorStateUpdated", value, updateProcessedCb) && success;
+            updated = true;
+
+            success = this._dispatchToControllers("globalErrorStateUpdated", value, function(_err) {
+                if (_.def(_err)) {
+                    err.error_hash["dispatched globalErrorStateUpdated to controllers"] = _err;
+                }
+
+                var result = this._callCustomMethod("_globalErrorStateUpdated", "", value, function(_err) {
+                    if (_.def(_err)) {
+                        err.error_hash["calling custom method _globalErrorStateUpdated"] = _err;
+                    }
+
+                    updateProcessedCb(updated, !_.empty(err.error_hash) ? err : null);
+                });
+
+                if (!result.called) {
+                    updateProcessedCb(updated, !_.empty(err.error_hash) ? err : null);
+                } else if (result.result !== false) {
+                    err.error_hash["initiating custom method _globalErrorStateUpdated"] = {
+                        message : "A problem occurred initiating custom method _globalErrorStateUpdated"
+                    };
+
+                    updateProcessedCb(updated, err);
+                }
+            });
 
             return success;
         },
@@ -532,7 +728,11 @@
         /**
          *
          * Updates the error state of <property> to <value> and notifies connected controllers that it is updated.
-         * When the update is processed you can optionally use the updateProcessedCb(err) callback
+         * After updating the controllers, the global error state is recalculated and updated.
+         * Finally, if it is defined, a custom method
+         * _errorStateUpdatedFor<Property>(value, readyCb) is called.
+         *
+         * Only when all steps are completed the optional updateProcessedCb(updated, err) is called.
          *
          * This method sends a errorStateUpdated event to the controllers with the following data object:
          * {
@@ -542,7 +742,9 @@
          *
          * @param {string} property                 property that is updated
          * @param {*} value                         New value for the error state of <property>
-         * @param {function} [updateProcessedCb]    Callback called when update has been processed
+         * @param {function} [updateProcessedCb]    Callback(updated, err) called when update has been processed
+         *                                          When updated is false and err is not an object, no update was
+         *                                          performed because the value didn't change.
          *
          * @returns {boolean}                       True if update was initiated successfully, false otherwise.
          *
@@ -555,6 +757,10 @@
             var self    = this;
 
             var success = false;
+            var updated = false;
+            var err     = {
+                error_hash : {}
+            };
 
             if (!this._stateInitialized) {
                 _l.error(me, "State object is not initialized, call _initStateProcessing() in your constructor first");
@@ -569,39 +775,64 @@
             updateProcessedCb = _.ensureFunc(updateProcessedCb);
 
             if (_.equals(this._state.error[property], value)) {
-                return success;
+                _l.debug(me, "Value for error state of property {0} did not change, nothing to update".fmt(property));
+                //In next runloop, callback without error but with updated = false
+                setTimeout(function() { updateProcessedCb(updated); }, 0);
+                return (success = true);
             }
 
             this._state.error[property] = value;
+            updated = true;
 
-            success = this._callCustomMethod("_errorStateUpdatedFor", property, value);
             success = this._dispatchToControllers("errorStateUpdated", {
                 what : property,
                 data : value
-            }, function(err) {
-                if (_.def(err)) {
-                    _l.error(me, ("Processing errorStateUpdated event for {0} failed, " +
-                                  "continuing anyway ... Error : ").fmt(property), _.stringify(err));
+            }, function(_err) {
+                if (_.def(_err)) {
+                    err.error_hash["dispatched errorStateUpdated to controllers"] = _err;
                 }
 
-                self._updateGlobalErrorState(self._calcGlobalErrorState(), function(_err) {
-                    if (!_.def(_err)) {
-                        //propagate error
-                        _err = err;
+                var initSuccess = self._updateGlobalErrorState(self._calcGlobalErrorState(), function(_updated, _err) {
+                    if (_.def(_err)) {
+                        err.error_hash["updating globalErrorState"] = _err;
                     }
 
-                    updateProcessedCb(_err);
+                    var result = self._callCustomMethod("_errorStateUpdatedFor", "", value, function (_err) {
+                        if (_.def(_err)) {
+                            err.error_hash["calling custom method _errorStateUpdatedFor {0}".fmt(property)] = _err;
+                        }
+
+                        updateProcessedCb(updated, !_.empty(err.error_hash) ? err : null);
+                    });
+
+                    if (!result.called) {
+                        updateProcessedCb(updated, !_.empty(err.error_hash) ? err : null);
+                    } else if (result.result === false) {
+                        err.error_hash["Initiating custom method _errorStateUpdatedFor {0}".fmt(property)] = {
+                            message : "Problem occurred initiating"
+                        };
+
+                        updateProcessedCb(updated, err);
+                    }
                 });
-            }) && success;
+
+                if (!initSuccess) {
+                    err.error_hash["Initiating _updateGlobalErrorState"] = {
+                        message : "Problem occurred initiating _updateGlobalErrorState"
+                    };
+
+                    updateProcessedCb(updated, err);
+                }
+            });
 
             return success;
         },
 
         /**
          *
-         * Calculates how many properties have errors as global error state value.
+         * Provides a list of properties that have errors.
          *
-         * @returns {number} Number of properties that have errors, -1 implies unknown
+         * @returns {number} Provides a list of properties that have errors. Null means unknown.
          *
          * @protected
          */
@@ -609,14 +840,14 @@
             var iName   = _.call(this, 'getIName') || "[UNKOWN]";
             var me      = "{0}::ModelProcessesState::_calcGlobalErrorState".fmt(iName);
 
-            var globalErrorState = -1;
+            var globalErrorState = null;
 
             if (!this._stateInitialized) {
                 _l.error(me, "State object is not initialized, call _initStateProcessing() in your constructor first");
                 return globalErrorState;
             }
 
-            globalErrorState    = 0;
+            globalErrorState    = [];
             var error           = this._state.error;
             if (_.empty(error)) {
                 return globalErrorState;
@@ -630,7 +861,7 @@
 
                 errState = error[property];
                 if (_.def(errState) && (errState !== false)) {
-                    globalErrorState++;
+                    globalErrorState.push(property);
                 }
             }
 
@@ -639,8 +870,85 @@
 
         /**
          *
+         * Updates the global validity state to <value> and notifies connected controllers that it is updated.
+         * After updating the controllers, if it is defined, a custom method
+         * _globalValidityStateUpdated(value, readyCb) is called.
+         *
+         * Only when both steps are completed the optional updateProcessedCb(updated, err) is called.
+         *
+         * This method sends a globalValidityStateUpdated event to the controllers.
+         *
+         * @param {*} value                         New value of the global validity state
+         * @param {function} [updateProcessedCb]    Callback(updated, err) called when update has been processed
+         *                                          When updated is false and err is not an object, no update was
+         *                                          performed because the value didn't change.
+         *
+         * @returns {boolean}                       True if update was initiated successfully, false otherwise.
+         *
+         * @protected
+         *
+         */
+        _updateGlobalValidityState : function(value, updateProcessedCb) {
+            var iName   = _.call(this, 'getIName') || "[UNKOWN]";
+            var me      = "{0}::ModelProcessesState::_updateGlobalValidityState".fmt(iName);
+
+            var success = false;
+            var updated = false;
+            var err     = {
+                error_hash : {}
+            };
+
+            if (!this._stateInitialized) {
+                _l.error(me, "State object is not initialized, call _initStateProcessing() in your constructor first");
+                return success;
+            }
+
+            updateProcessedCb = _.ensureFunc(updateProcessedCb);
+
+            if (_.equals(this._state.globalValidity, value)) {
+                _l.debug(me, "Value for global error state did not change, nothing to update");
+                //In next runloop, callback without error but with updated = false
+                setTimeout(function() { updateProcessedCb(updated); }, 0);
+                return (success = true);
+            }
+
+            this._state.globalValidity = value;
+            updated = true;
+
+            success = this._dispatchToControllers("globalValidityStateUpdated", value, function(_err) {
+                if (_.def(_err)) {
+                    err.error_hash["dispatched globalValidityStateUpdated to controllers"] = _err;
+                }
+
+                var result = this._callCustomMethod("_globalValidityStateUpdated", "", value, function(_err) {
+                    if (_.def(_err)) {
+                        err.error_hash["calling custom method _globalValidityStateUpdated"] = _err;
+                    }
+
+                    updateProcessedCb(updated, !_.empty(err.error_hash) ? err : null);
+                });
+
+                if (!result.called) {
+                    updateProcessedCb(updated, !_.empty(err.error_hash) ? err : null);
+                } else if (result.result !== false) {
+                    err.error_hash["initiating custom method _globalValidityStateUpdated"] = {
+                        message : "A problem occurred initiating"
+                    };
+
+                    updateProcessedCb(updated, err);
+                }
+            });
+
+            return success;
+        },
+
+        /**
+         *
          * Updates the validity state of <property> to <value> and notifies connected controllers that it is updated.
-         * When the update is processed you can optionally use the updateProcessedCb(err) callback
+         * After updating the controllers, if it is defined, a custom method
+         * _errorStateUpdatedFor<Property>(value, readyCb) is called.
+         *
+         * Only when both steps are completed the optional updateProcessedCb(updated, err) is called.
          *
          * This method sends a validityStateUpdated event to the controllers with the following data object:
          * {
@@ -650,7 +958,9 @@
          *
          * @param {string} property                 property that is updated
          * @param {*} value                         New value for the validity state of <property>
-         * @param {function} [updateProcessedCb]    Callback called when update has been processed
+         * @param {function} [updateProcessedCb]    Callback(updated, err) called when update has been processed
+         *                                          When updated is false and err is not an object, no update was
+         *                                          performed because the value didn't change.
          *
          * @returns {boolean}                       True if update was initiated successfully, false otherwise.
          *
@@ -662,6 +972,10 @@
             var me      = "{0}::ModelProcessesState::_updateValidityState".fmt(iName);
 
             var success = false;
+            var updated = false;
+            var err     = {
+                error_hash : {}
+            };
 
             if (!this._stateInitialized) {
                 _l.error(me, "State object is not initialized, call _initStateProcessing() in your constructor first");
@@ -673,19 +987,103 @@
                 return success;
             }
 
+            updateProcessedCb = _.ensureFunc(updateProcessedCb);
+
             if (_.equals(this._state.validity[property], value)) {
-                return success;
+                _l.debug(me, ("Value for validity state of property {0} did not change, " +
+                              "nothing to update").fmt(property));
+                //In next runloop, callback without error but with updated = false
+                setTimeout(function() { updateProcessedCb(updated); }, 0);
+                return (success = true);
             }
 
             this._state.validity[property] = value;
+            updated = true;
 
-            success = this._callCustomMethod("_validityStateUpdatedFor", property, value);
             success = this._dispatchToControllers("validityStateUpdated", {
                 what : property,
                 data : value
-            }, updateProcessedCb) && success;
+            }, function(_err) {
+                if (_.def(_err)) {
+                    err.error_hash["dispatched validityStateUpdated to controllers"] = _err;
+                }
+
+                var initSuccess = self._updateGlobalValidityState(self._calcGlobalValidityState(), function(_updated, _err) {
+                    if (_.def(_err)) {
+                        err.error_hash["updating globalValidityState"] = _err;
+                    }
+
+                    var result = self._callCustomMethod("_validityStateUpdatedFor", "", value, function (_err) {
+                        if (_.def(_err)) {
+                            err.error_hash["calling custom method _validityStateUpdatedFor {0}".fmt(property)] = _err;
+                        }
+
+                        updateProcessedCb(updated, !_.empty(err.error_hash) ? err : null);
+                    });
+
+                    if (!result.called) {
+                        updateProcessedCb(updated, !_.empty(err.error_hash) ? err : null);
+                    } else if (result.result === false) {
+                        err.error_hash["Initiating custom method _validityStateUpdatedFor {0}".fmt(property)] = {
+                            message : "Problem occurred initiating"
+                        };
+
+                        updateProcessedCb(updated, err);
+                    }
+                });
+
+                if (!initSuccess) {
+                    err.error_hash["Initiating _updateGlobalValidityState"] = {
+                        message : "Problem occurred initiating"
+                    };
+
+                    updateProcessedCb(updated, err);
+                }
+            });
 
             return success;
+        },
+
+
+        /**
+         *
+         * Provides a list of properties that are INvalid.
+         *
+         * @returns {number} Provides a list of properties that are INvalid. Null means unknown.
+         *
+         * @protected
+         *
+         */
+        _calcGlobalValidityState : function() {
+            var iName   = _.call(this, 'getIName') || "[UNKOWN]";
+            var me      = "{0}::ModelProcessesState::_calcGlobalValidityState".fmt(iName);
+
+            var globalValidityState = null;
+
+            if (!this._stateInitialized) {
+                _l.error(me, "State object is not initialized, call _initStateProcessing() in your constructor first");
+                return globalValidityState;
+            }
+
+            globalValidityState    = [];
+            var validity           = this._state.validity;
+            if (_.empty(validity)) {
+                return globalValidityState;
+            }
+
+            var validityState = null;
+            for (var property in validity) {
+                if (!validity.hasOwnProperty(property)) {
+                    continue;
+                }
+
+                validityState = validity[property];
+                if (_.get(validityState, "valid") === false) {
+                    globalValidityState.push(property);
+                }
+            }
+
+            return globalValidityState;
         },
 
         _isEqual : function(property, oldVal, newVal) {
@@ -713,25 +1111,56 @@
             return methodPrefix + _.capitaliseFirst(property);
         },
 
-        _callCustomMethod : function(methodPrefix, property, value) {
-            var success         = true;
+        /**
+         *
+         * Calls custom callback, with its name based on methodPrefix and property, if available.
+         * The return value of this function is an object containing info about the process:
+         *
+         * {
+         *      result : <return value of the call, if not called this is undefined>,
+         *      called : <true if method called, else false>
+         * }
+         *
+         * NOTE : Custom methods must return a boolean value indicating that the task of method was successfully
+         * initiated.
+         *
+         * @param {string} methodPrefix             The string the custom method name starts with
+         * @param {string} property                 The property name, together with the methodPrefix form the custom
+         *                                          method name. Also see _getCustomMethodName().
+         * @param {*} value                         The first argument of the custom method to be called
+         * @param {function} [callback]             The second argument of the custom method to be called
+         * @param {boolean} [returnsBoolean=true]   True if the custom method must return a boolean, else false
+         *
+         *
+         * @returns {object}                    See definition above
+         *
+         * @protected
+         */
+        _callCustomMethod : function(methodPrefix, property, value, callback, returnsBoolean) {
+            var result          = {
+                result : undefined,
+                called : false
+            };
+
+            if (!_.bool(returnsBoolean)) {
+                returnsBoolean = true;
+            }
 
             var customFuncName  = this._getCustomMethodName(methodPrefix, property);
             var customFunc      = this[customFuncName];
             if (_.func(customFunc)) {
-                success = customFunc.call(this, value);
-                if (!_.bool(success)) {
+                result.result = customFunc.call(this, value, callback);
+                result.called = true;
+                if (returnsBoolean && (!_.bool(result.result))) {
                     var iName   = _.call(this, 'getIName') || "[UNKOWN]";
                     var me      = "{0}::ModelProcessesState::_callCustomMethod".fmt(iName);
 
                     _l.warn(me, ("Custom method {0} did not return a " +
-                                 "boolean success value").fmt(customFuncName));
-
-                    success = true;
+                                 "boolean value").fmt(customFuncName));
                 }
             }
 
-            return success;
+            return result;
         }
 
     });

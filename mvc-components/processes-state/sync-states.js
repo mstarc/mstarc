@@ -16,6 +16,12 @@
         SYNCED      : 2
     };
 
+    NS.SyncStateName = {};
+    NS.SyncStateName[NS.SyncState.UNKNOWN]      = "Unknown";
+    NS.SyncStateName[NS.SyncState.SYNC_ERROR]   = "Syncing Error";
+    NS.SyncStateName[NS.SyncState.NOT_SYNCED]   = "Not Synced";
+    NS.SyncStateName[NS.SyncState.SYNCING]      = "Syncing";
+    NS.SyncStateName[NS.SyncState.SYNCED]       = "Synced";
 })();
 
 
