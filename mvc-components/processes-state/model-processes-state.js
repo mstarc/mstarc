@@ -89,6 +89,7 @@
          *      //overall sync state
          *      globalSyncing : <unknown || sync_error || not_synced || syncing || synced>,
          *
+         *      //TODO : complex state
          *      //sync state of each property
          *      syncing : {
          *          <prop_1> : <unknown || sync_error || not_synced || syncing || synced || null>,
@@ -178,6 +179,104 @@
          * @for     Model
          *
          */
+
+        /**
+         *
+         * Get data state for <property>
+         *
+         * @param property
+         *
+         * @returns {*}
+         *
+         */
+        getState : function(property) {
+            var iName           = _.call(this, 'getIName') || "[UNKOWN]";
+            var me              = "{0}::ModelProcessesState::getState".fmt(iName);
+
+            var value           = null;
+
+            if (!_.string(property) || _.empty(property)) {
+                _l.error(me, "Property is not valid, unable to get data state for property");
+                return value;
+            }
+
+            return _.get(this._getState("data"), property);
+        },
+
+        /**
+         *
+         * Get global syncing state
+         *
+         * @returns {array | null}
+         *
+         */
+        getGlobalSyncingState : function() {
+            return this._getState("globalSyncing");
+        },
+
+        /**
+         *
+         * Get global error state
+         *
+         * @returns {array | null}
+         *
+         */
+        getGlobalErrorState : function() {
+            return this._getState("globalError");
+        },
+
+        /**
+         *
+         * Get error state for <property>
+         *
+         * @returns {array | null}
+         *
+         */
+        getErrorState : function(property) {
+            var iName           = _.call(this, 'getIName') || "[UNKOWN]";
+            var me              = "{0}::ModelProcessesState::getErrorState".fmt(iName);
+
+            var value           = null;
+
+            if (!_.string(property) || _.empty(property)) {
+                _l.error(me, "Property is not valid, unable to get error state for property");
+                return value;
+            }
+
+            return _.get(this._getState("error"), property);
+        },
+
+        /**
+         *
+         * Get global error state
+         *
+         * @returns {array | null}
+         *
+         */
+        getGlobalValidityState : function() {
+            return this._getState("globalValidity");
+        },
+
+        /**
+         *
+         * Get validity state for <property>
+         *
+         * @returns {array | null}
+         *
+         */
+        getValidityState : function(property) {
+            var iName           = _.call(this, 'getIName') || "[UNKOWN]";
+            var me              = "{0}::ModelProcessesState::getValidityState".fmt(iName);
+
+            var value           = null;
+
+            if (!_.string(property) || _.empty(property)) {
+                _l.error(me, "Property is not valid, unable to get error state for property");
+                return value;
+            }
+
+            return _.get(this._getState("validity"), property);
+        },
 
         /**
          *
@@ -315,7 +414,7 @@
 
             var validityState = this._state.globalValidity;
             if (!_.empty(validityState)) {
-                _l.warn(me, "The following properties are invalid, unable to sync: {0}".fmt(validityState));
+                _l.error(me, "The following properties are invalid, unable to sync: {0}".fmt(validityState));
                 return syncingStarted;
             }
 
@@ -369,6 +468,39 @@
             };
 
             this._stateInitialized = true;
+        },
+
+        /**
+         *
+         * Get data <stateType> state data
+         *
+         * @param {string} stateType
+         *
+         * @returns {*}
+         *
+         */
+        _getState : function(stateType) {
+            var iName           = _.call(this, 'getIName') || "[UNKOWN]";
+            var me              = "{0}::ModelProcessesState::_getState".fmt(iName);
+
+            var stateData       = null;
+
+            if (_.exec(this, "isValid") === false) {
+                _l.error(me, "Model is invalid, unable to getState");
+                return stateData;
+            }
+
+            if (!this._stateInitialized) {
+                _l.error(me, "State object is not initialized, call _initStateProcessing() in your constructor first");
+                return stateData;
+            }
+
+            if (!_.string(stateType) || _.empty(stateType)) {
+                _l.error(me, "stateType is not valid, unable to get state data for stateType");
+                return stateData;
+            }
+
+            return stateData;
         },
 
         _sync : function(cbSynced) {
