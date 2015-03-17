@@ -125,13 +125,23 @@
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
             var me              = "{0}::ControllerProcessesState::_processModelEvent({1})"
                                   .fmt(iName, eventName);
-            var errStr          = null;
 
             //unpack arguments
             processingArguments = processingArguments || [];
             var model           = processingArguments[0];
             var data            = processingArguments[1];
             var eventProcessedCb= processingArguments[2];
+
+            var callbackGiven   = _.func(eventProcessedCb);
+
+            var __returnError   = function(errStr) {
+                callbackGiven ? eventProcessedCb({ message : errStr }) :  _l.error(me, errStr);
+            };
+
+            if (_.exec(this, "isValid") === false) {
+                __returnError("Controller is invalid, unable to process {0} event".fmt(eventName));
+                return;
+            }
 
             var dataDesc        = 'Data of {0} event'.fmt(eventName);
             var property        = isGlobal ? null : _.get(data, 'what', dataDesc);
@@ -140,11 +150,8 @@
             //Default behavior is to forward the event and value
             var forward         = true;
 
-            var callbackGiven   = _.func(eventProcessedCb);
-
-            if ((!_.string(property)) || (_.empty(property))) {
-                errStr = "No valid data property provided, unable to process {0} event".fmt(eventName);
-                callbackGiven ? eventProcessedCb({ message : errStr }) :  _l.error(me, errStr);
+            if (!isGlobal && (!_.string(property) || _.empty(property))) {
+                __returnError("No valid data property provided, unable to process {0} event".fmt(eventName));
                 return;
             }
 
@@ -153,15 +160,13 @@
                 var result = isGlobal ? customFunc.call(this, model, value) :
                                            customFunc.call(this, model, property, value);
                 if (!_.obj(result)) {
-                    errStr = ("{0} did not return an object with results, " +
-                              "unable to process {1} event").fmt(customProcessMethodName, eventName);
-                    callbackGiven ? eventProcessedCb({ message : errStr }) :  _l.error(me, errStr);
+                    __returnError(("{0} did not return an object with results, " +
+                                   "unable to process {1} event").fmt(customProcessMethodName, eventName));
                     return;
                 }
 
                 if (result.success !== true) {
-                    errStr = "Custom processing of the {0} event was not successful".fmt(eventName);
-                    callbackGiven ? eventProcessedCb({ message : errStr }) :  _l.error(me, errStr);
+                    __returnError("Custom processing of the {0} event was not successful".fmt(eventName));
                     return;
                 }
 
