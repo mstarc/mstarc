@@ -136,7 +136,7 @@
          *
          */
         deregister : function(processor) {
-            var instanceName = _.call(this, 'getIName') || '[UNKOWN]';
+            var instanceName = _.exec(this, 'getIName') || '[UNKOWN]';
             var me = "[{0}]::DispatchesEvents::deregister".fmt(instanceName);
             var success = false;
 
@@ -203,7 +203,7 @@
          *
          */
         _dispatch : function(eventName, eventData, cbEventProcessed) {
-            //var me      = "[{0}]::DispatchesEvents::_dispatch".fmt(_.call(this, 'getIName') || '[UNKOWN]');
+            //var me      = "[{0}]::DispatchesEvents::_dispatch".fmt(_.exec(this, 'getIName') || '[UNKOWN]');
             var self    = this;
 
             this._processors = this._processors || {};
@@ -247,7 +247,7 @@
          *
          */
         _dispatchThrottled : function(eventName, eventData, cbEventProcessed, throttleDelay) {
-            //var me      = "[{0}]::DispatchesEvents::_dispatchThrottled".fmt(_.call(this, 'getIName') || '[UNKOWN]');
+            //var me      = "[{0}]::DispatchesEvents::_dispatchThrottled".fmt(_.exec(this, 'getIName') || '[UNKOWN]');
 
             this._processors = this._processors || {};
 
@@ -288,7 +288,7 @@
             this._processorsIndex   = this._processorsIndex || {};
 
             if (!_.hasMethod(processor, 'processEvent')) {
-                var iName           = _.call(this, 'getIName') || "[UNKOWN]";
+                var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
                 var me              = "{0}::DispatchesEvents::_dispatchEvent".fmt(iName);
                 var processorName   = this._processorsIndex[processor] || "[UNKNOWN]";
 
@@ -325,7 +325,7 @@
             }
 
             if (!_.hasMethod(processor, 'processEvent')) {
-                var iName           = _.call(this, 'getIName') || "[UNKOWN]";
+                var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
                 var me              = "{0}::DispatchesEvents::_scheduleEventDispatch".fmt(iName);
                 var processorName   = this._processorsIndex[processor] || "[UNKNOWN]";
 

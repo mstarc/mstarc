@@ -12,92 +12,108 @@
 
     var Class       = window.jsface.Class;
 
-    var SyncState   = NS.SyncState;
-
-    NS.ModelProcessesState = Class({
-
-        _state : null,
+    NS.ControllerProcessesState = Class({
 
         /**
          *
-         * ModelProcessesState Mixin for Model classes. Adds functionality to process state in a
+         * ControllerProcessesState Mixin for Controller classes. Adds functionality to process state in a
          * standardized way.
          *
+         * This mixin provides functionality to process the following model events
          *
-         * IMPORTANT : Call _initStateProcessing() during construction of your class that uses this mixin
+         *  - dataStateUpdated
+         *  - globalSyncStateUpdated
+         *  - globalErrorStateUpdated
+         *  - errorStateUpdated
+         *  - globalValidityStateUpdated
+         *  - validityStateUpdated
          *
+         * By default, the event and data is forwarded to the connected view.
+         * However, the class using this mixin can define custom methods to:
          *
-         * State is structured as follows:
+         * A) Transform the event value, when required.  The value needs to be returned such that it
+         *    can be forwarded to the view.
+         * B) Send messages to the state manager, when required.
+         * C) Evaluate if the the event (with (transformed) value) must be forwarded or not
+         *
+         * The default processing methods will try to call one of the following custom methods, depending on which
+         * event they process:
+         *
+         * - _processDataState(model, property, value);
+         *
+         * - _processGlobalSyncState(model, value);
+         *   value : <new global sync state value>
+         *
+         * - _processGlobalErrorState(model, value);
+         *   value : <new global sync state value>
+         *
+         * - _processErrorState(model, property, value);
+         * - _processGlobalValidityState(model, value);
+         *
+         * - _processValidityState(model, property, value);
+         *
+         * IMPORTANT : These custom methods must return the following object :
          * {
-         *      // The actual state property values.
-         *      data : {
-         *          <prop_1> : <prop_1_value>,
-         *          ...
-         *          <prop_N> : <prop_N_value>,
-         *      },
-         *
-         *      //overall sync state
-         *      globalSyncing : <unknown || not_synced || syncing || synced>,
-         *
-         *      //sync state of each property
-         *      syncing : {
-         *          <prop_1> : <unknown || not_synced || syncing || synced || null>,
-         *          ...
-         *          <prop_N> : <unknown || not_synced || syncing || synced || null>
-         *      },
-         *
-         *      //overall error state
-         *      globalError : <error_object || boolean || null>,
-         *
-         *      // Error object for any state property that has an error
-         *      error : {
-         *          <prop_1> : <prop_1_error_object || boolean || null>,
-         *          ...
-         *          <prop_N> : <prop_N_error_object || boolean || null>
-         *      },
-         *
-         *      //Validity for each property
-         *      validity : {
-         *          <prop_1> : <prop_1_validity_object || null>,
-         *          ...
-         *          <prop_N> : <prop_N_validity_object || null>
-         *      }
+         *      success : <boolean, true when processing was successful, else false>,
+         *      value   : <*, the input value, optionally transformed>,
+         *      forward : <boolean, true when the event with value needs to be forwarded to the view, else false>
          * }
          *
-         * Error objects are defined as follows:
-         * {
-         *      message         : <error message>,
-         *      code            : <OPTIONAL : error code>,
-         *      original_error  : <OPTIONAL : error object || error message string>
-         * }
-         *
-         * Validity object:
-         * {
-         *      valid           : <true || false>,
-         *      message         : <descriptions of what is wrong>,
-         *      requirements    : <description of the value requirements>,
-         * }
-         *
-         * Data state, sync state, error state and validity state are updated and propagated
-         * in the following standardized way:
-         *
-         * _updateDataState(property, value, updateProcessedCb)
-         *
-         * _updateGlobalSyncState(syncValue, updateProcessedCb)
-         * _updateSyncState(property, sync_value, updateProcessedCb)
-         *
-         * _updateGlobalErrorState(errorValue, updateProcessedCb)
-         * _updateErrorState(property, errorValue, updateProcessedCb)
-         *
-         * _updateValidityState(property, validityValue, updateProcessedCb)
-         *
-         *
-         * @class   ModelProcessesState
+         * @class   ControllerProcessesState
          * @module  M*C
          *
-         * @for     Model
+         * @for     Controller
          *
          */
+
+        dataStateUpdated : function(model, data, eventProcessedCb) {
+            this._processModelEvent(
+                    "_processDataState",
+                    "dataStateUpdated",
+                    false,
+                    arguments);
+        },
+
+        globalSyncStateUpdated : function(model, data, eventProcessedCb) {
+            this._processModelEvent(
+                    "_processGlobalSyncState",
+                    "globalSyncStateUpdated",
+                    true,
+                    arguments);
+        },
+
+        globalErrorStateUpdated : function(model, data, eventProcessedCb) {
+            this._processModelEvent(
+                    "_processGlobalErrorState",
+                    "globalErrorStateUpdated",
+                    true,
+                    arguments);
+        },
+
+
+        errorStateUpdated : function(model, data, eventProcessedCb) {
+            this._processModelEvent(
+                    "_processGlobalErrorState",
+                    "globalErrorStateUpdated",
+                    false,
+                    arguments);
+        },
+
+        globalValidityStateUpdated : function(model, data, eventProcessedCb) {
+            this._processModelEvent(
+                    "_processGlobalValidityState",
+                    "globalValidityStateUpdated",
+                    true,
+                    arguments);
+        },
+
+        validityStateUpdated : function(model, data, eventProcessedCb) {
+            this._processModelEvent(
+                    "_processValidityState",
+                    "validityStateUpdated",
+                    false,
+                    arguments);
+        },
 
         /*********************************************************************
          *
@@ -105,226 +121,61 @@
          *
          *********************************************************************/
 
-        _initStateProcessing : function() {
-            this._state = {
-                //The actual state property values
-                data        : {},
+        _processModelEvent : function(customProcessMethodName, eventName, isGlobal, processingArguments) {
+            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
+            var me              = "{0}::ControllerProcessesState::_processModelEvent({1})"
+                                  .fmt(iName, eventName);
+            var errStr          = null;
 
-                globalSync  : SyncState.UNKNOWN,
-                syncState   : {},
+            //unpack arguments
+            processingArguments = processingArguments || [];
+            var model           = processingArguments[0];
+            var data            = processingArguments[1];
+            var eventProcessedCb= processingArguments[2];
 
-                globalError : null,
-                error       : {}
-            };
-        },
+            var dataDesc        = 'Data of {0} event'.fmt(eventName);
+            var property        = isGlobal ? null : _.get(data, 'what', dataDesc);
+            var value           = isGlobal ? data : _.get(data, 'data', dataDesc);
 
+            //Default behavior is to forward the event and value
+            var forward         = true;
 
-        /**
-         *
-         * Updates the data state <property> to <value> and notifies connected controllers that it is updated.
-         * When the update is processed you can optionally use the updateProcessedCb(err) callback
-         *
-         * This method sends a dataStateUpdated event to the controllers with the following data object:
-         * {
-         *  what : <property>,
-         *  data : <value>
-         * }
-         *
-         * @param {string} property                 property that is updated
-         * @param {*} value                         New value for the data state of <property>
-         * @param {function} [updateProcessedCb]    Callback called when update has been processed
-         *
-         * @returns {boolean}                       True if update was initiated successfully, false otherwise.
-         *
-         * @protected
-         *
-         */
-        _updateDataState : function(property, value, updateProcessedCb) {
-            var iName   = _.call(this, 'getIName') || "[UNKOWN]";
-            var me      = "{0}::ModelProcessesState::_updateDataState".fmt(iName);
+            var callbackGiven   = _.func(eventProcessedCb);
 
-            var success = false;
-
-            if (!_.string(property) || _.empty(property)) {
-                _l.error(me, "Property is not valid, unable to update data state and notify controllers");
-                return success;
+            if ((!_.string(property)) || (_.empty(property))) {
+                errStr = "No valid data property provided, unable to process {0} event".fmt(eventName);
+                callbackGiven ? eventProcessedCb({ message : errStr }) :  _l.error(me, errStr);
+                return;
             }
 
-            _.set(this._state, "data."+property, value, "State object");
+            var customFunc = this[customProcessMethodName];
+            if (_.func(customFunc)) {
+                var result = isGlobal ? customFunc.call(this, model, value) :
+                                           customFunc.call(this, model, property, value);
+                if (!_.obj(result)) {
+                    errStr = ("{0} did not return an object with results, " +
+                              "unable to process {1} event").fmt(customProcessMethodName, eventName);
+                    callbackGiven ? eventProcessedCb({ message : errStr }) :  _l.error(me, errStr);
+                    return;
+                }
 
-            this._dispatchToControllers("dataStateUpdated", {
-                what : property,
-                data : value
-            });
-        },
+                if (result.success !== true) {
+                    errStr = "Custom processing of the {0} event was not successful".fmt(eventName);
+                    callbackGiven ? eventProcessedCb({ message : errStr }) :  _l.error(me, errStr);
+                    return;
+                }
 
-        /**
-         *
-         * Updates the global sync state to <value> and notifies connected controllers that it is updated.
-         * When the update is processed you can optionally use the updateProcessedCb(err) callback
-         *
-         * This method sends a globalSyncStateUpdated event to the controllers.
-         *
-         * @param {*} value                         New value for the global sync state
-         * @param {function} [updateProcessedCb]    Callback called when update has been processed
-         *
-         * @returns {boolean}                       True if update was initiated successfully, false otherwise.
-         *
-         * @protected
-         *
-         */
-        _updateGlobalSyncState : function(value, updateProcessedCb) {
-            var iName   = _.call(this, 'getIName') || "[UNKOWN]";
-            var me      = "{0}::ModelProcessesState::_updateGlobalSyncState".fmt(iName);
-
-            var success = false;
-
-            _.set(this._state, "globalSyncing", value, "State object");
-
-            this._dispatchToControllers("globalSyncStateUpdated", value);
-        },
-
-        /**
-         *
-         * Updates the sync state of <property> to <value> and notifies connected controllers that it is updated.
-         * When the update is processed you can optionally use the updateProcessedCb(err) callback
-         *
-         * This method sends a syncStateUpdated event to the controllers with the following data object:
-         * {
-         *  what : <property>,
-         *  data : <value>
-         * }
-         *
-         * @param {string} property                 property that is updated
-         * @param {*} value                         New value for the sync state of <property>
-         * @param {function} [updateProcessedCb]    Callback called when update has been processed
-         *
-         * @returns {boolean}                       True if update was initiated successfully, false otherwise.
-         *
-         * @protected
-         *
-         */
-        _updateSyncState : function(property, value, updateProcessedCb) {
-            var iName   = _.call(this, 'getIName') || "[UNKOWN]";
-            var me      = "{0}::ModelProcessesState::_updateSyncState".fmt(iName);
-
-            var success = false;
-
-            if (!_.string(property) || _.empty(property)) {
-                _l.error(me, "Property is not valid, unable to update sync state and notify controllers");
-                return success;
+                value   = result.value;
+                forward = _.bool(result.forward) ? result.forward : forward;
             }
 
-            _.set(this._state, "syncing."+property, value, "State object");
-
-            this._dispatchToControllers("syncStateUpdated", {
-                what : property,
-                data : value
-            });
-        },
-
-        /**
-         *
-         * Updates the global error state to <value> and notifies connected controllers that it is updated.
-         * When the update is processed you can optionally use the updateProcessedCb(err) callback
-         *
-         * This method sends a globalErrorStateUpdated event to the controllers.
-         *
-         * @param {*} value                         New value of the global error state
-         * @param {function} [updateProcessedCb]    Callback called when update has been processed
-         *
-         * @returns {boolean}                       True if update was initiated successfully, false otherwise.
-         *
-         * @protected
-         *
-         */
-        _updateGlobalErrorState : function(value, updateProcessedCb) {
-            var iName   = _.call(this, 'getIName') || "[UNKOWN]";
-            var me      = "{0}::ModelProcessesState::_updateGlobalErrorState".fmt(iName);
-
-            var success = false;
-
-            _.set(this._state, "globalError", value, "State object");
-
-            this._dispatchToControllers("globalErrorStateUpdated", value);
-        },
-
-        /**
-         *
-         * Updates the error state of <property> to <value> and notifies connected controllers that it is updated.
-         * When the update is processed you can optionally use the updateProcessedCb(err) callback
-         *
-         * This method sends a errorStateUpdated event to the controllers with the following data object:
-         * {
-         *  what : <property>,
-         *  data : <error value>
-         * }
-         *
-         * @param {string} property                 property that is updated
-         * @param {*} value                         New value for the error state of <property>
-         * @param {function} [updateProcessedCb]    Callback called when update has been processed
-         *
-         * @returns {boolean}                       True if update was initiated successfully, false otherwise.
-         *
-         * @protected
-         *
-         */
-        _updateErrorState : function(property, value, updateProcessedCb) {
-            var iName   = _.call(this, 'getIName') || "[UNKOWN]";
-            var me      = "{0}::ModelProcessesState::_updateErrorState".fmt(iName);
-
-            var success = false;
-
-            if (!_.string(property) || _.empty(property)) {
-                _l.error(me, "Property is not valid, unable to update error state and notify controllers");
-                return success;
+            //Forward
+            if (forward) {
+                var eventData = isGlobal ? value : { what : property, data : value };
+                this._dispatchToView(eventName, eventData, eventProcessedCb);
+            } else {
+                eventProcessedCb();
             }
-
-            _.set(this._state, "error."+property, value, "State object");
-
-            this._dispatchToControllers("errorStateUpdated", {
-                what : property,
-                data : value
-            });
-        },
-
-        /**
-         *
-         * Updates the validity state of <property> to <value> and notifies connected controllers that it is updated.
-         * When the update is processed you can optionally use the updateProcessedCb(err) callback
-         *
-         * This method sends a errorStateUpdated event to the controllers with the following data object:
-         * {
-         *  what : <property>,
-         *  data : <value>
-         * }
-         *
-         * @param {string} property                 property that is updated
-         * @param {*} value                         New value for the validity state of <property>
-         * @param {function} [updateProcessedCb]    Callback called when update has been processed
-         *
-         * @returns {boolean}                       True if update was initiated successfully, false otherwise.
-         *
-         * @protected
-         *
-         */
-        _updateValidityState : function(property, value, updateProcessedCb) {
-            var iName   = _.call(this, 'getIName') || "[UNKOWN]";
-            var me      = "{0}::ModelProcessesState::_updateValidityState".fmt(iName);
-
-            var success = false;
-
-            if (!_.string(property) || _.empty(property)) {
-                _l.error(me, "Property is not valid, unable to update validity state and notify controllers");
-                return success;
-            }
-
-            _.set(this._state, "error."+property, value, "State object");
-
-            this._dispatchToControllers("validityStateUpdated", {
-                what : property,
-                data : value
-            });
         }
 
     });

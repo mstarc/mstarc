@@ -190,7 +190,7 @@
          *
          */
         getState : function(property) {
-            var iName           = _.call(this, 'getIName') || "[UNKOWN]";
+            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
             var me              = "{0}::ModelProcessesState::getState".fmt(iName);
 
             var value           = null;
@@ -207,7 +207,7 @@
          *
          * Get global syncing state
          *
-         * @returns {array | null}
+         * @returns {number | null}
          *
          */
         getGlobalSyncingState : function() {
@@ -229,11 +229,11 @@
          *
          * Get error state for <property>
          *
-         * @returns {array | null}
+         * @returns {object | null}
          *
          */
         getErrorState : function(property) {
-            var iName           = _.call(this, 'getIName') || "[UNKOWN]";
+            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
             var me              = "{0}::ModelProcessesState::getErrorState".fmt(iName);
 
             var value           = null;
@@ -261,11 +261,11 @@
          *
          * Get validity state for <property>
          *
-         * @returns {array | null}
+         * @returns {object | null}
          *
          */
         getValidityState : function(property) {
-            var iName           = _.call(this, 'getIName') || "[UNKOWN]";
+            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
             var me              = "{0}::ModelProcessesState::getValidityState".fmt(iName);
 
             var value           = null;
@@ -291,7 +291,7 @@
          *
          */
         edit : function(property, value, editProcessedCb) {
-            var iName           = _.call(this, 'getIName') || "[UNKOWN]";
+            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
             var me              = "{0}::ModelProcessesState::edit".fmt(iName);
 
             editProcessedCb     = _.ensureFunc(editProcessedCb);
@@ -394,7 +394,7 @@
         },
 
         sync : function(syncCb) {
-            var iName           = _.call(this, 'getIName') || "[UNKOWN]";
+            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
             var me              = "{0}::ModelProcessesState::edit".fmt(iName);
             var self            = this;
 
@@ -480,7 +480,7 @@
          *
          */
         _getState : function(stateType) {
-            var iName           = _.call(this, 'getIName') || "[UNKOWN]";
+            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
             var me              = "{0}::ModelProcessesState::_getState".fmt(iName);
 
             var stateData       = null;
@@ -504,7 +504,7 @@
         },
 
         _sync : function(cbSynced) {
-            var iName   = _.call(this, 'getIName') || "[UNKOWN]";
+            var iName   = _.exec(this, 'getIName') || "[UNKOWN]";
             var me      = "{0}::ModelProcessesState::_updateDataState".fmt(iName);
 
             var success = false;
@@ -540,7 +540,7 @@
          *
          */
         _updateDataState : function(property, value, updateProcessedCb) {
-            var iName   = _.call(this, 'getIName') || "[UNKOWN]";
+            var iName   = _.exec(this, 'getIName') || "[UNKOWN]";
             var me      = "{0}::ModelProcessesState::_updateDataState".fmt(iName);
 
             var success = false;
@@ -622,7 +622,7 @@
          *
          */
         _updateGlobalSyncState : function(value, updateProcessedCb) {
-            var iName   = _.call(this, 'getIName') || "[UNKOWN]";
+            var iName   = _.exec(this, 'getIName') || "[UNKOWN]";
             var me      = "{0}::ModelProcessesState::_updateGlobalSyncState".fmt(iName);
 
             var success = false;
@@ -699,7 +699,7 @@
          *
          */
         /*_updateSyncState : function(property, value, updateProcessedCb) {
-            var iName   = _.call(this, 'getIName') || "[UNKOWN]";
+            var iName   = _.exec(this, 'getIName') || "[UNKOWN]";
             var me      = "{0}::ModelProcessesState::_updateSyncState".fmt(iName);
             var self    = this;
 
@@ -752,7 +752,7 @@
          * @protected
          */
         /*_calcGlobalSyncState : function() {
-            var iName   = _.call(this, 'getIName') || "[UNKOWN]";
+            var iName   = _.exec(this, 'getIName') || "[UNKOWN]";
             var me      = "{0}::ModelProcessesState::_calcGlobalSyncState".fmt(iName);
 
             var globalSyncState = SyncState.SYNCED;
@@ -804,7 +804,7 @@
          *
          */
         _updateGlobalErrorState : function(value, updateProcessedCb) {
-            var iName   = _.call(this, 'getIName') || "[UNKOWN]";
+            var iName   = _.exec(this, 'getIName') || "[UNKOWN]";
             var me      = "{0}::ModelProcessesState::_updateGlobalErrorState".fmt(iName);
 
             var success = false;
@@ -884,7 +884,7 @@
          *
          */
         _updateErrorState : function(property, value, updateProcessedCb) {
-            var iName   = _.call(this, 'getIName') || "[UNKOWN]";
+            var iName   = _.exec(this, 'getIName') || "[UNKOWN]";
             var me      = "{0}::ModelProcessesState::_updateErrorState".fmt(iName);
             var self    = this;
 
@@ -969,7 +969,7 @@
          * @protected
          */
         _calcGlobalErrorState : function() {
-            var iName   = _.call(this, 'getIName') || "[UNKOWN]";
+            var iName   = _.exec(this, 'getIName') || "[UNKOWN]";
             var me      = "{0}::ModelProcessesState::_calcGlobalErrorState".fmt(iName);
 
             var globalErrorState = null;
@@ -1021,7 +1021,7 @@
          *
          */
         _updateGlobalValidityState : function(value, updateProcessedCb) {
-            var iName   = _.call(this, 'getIName') || "[UNKOWN]";
+            var iName   = _.exec(this, 'getIName') || "[UNKOWN]";
             var me      = "{0}::ModelProcessesState::_updateGlobalValidityState".fmt(iName);
 
             var success = false;
@@ -1100,7 +1100,7 @@
          *
          */
         _updateValidityState : function(property, value, updateProcessedCb) {
-            var iName   = _.call(this, 'getIName') || "[UNKOWN]";
+            var iName   = _.exec(this, 'getIName') || "[UNKOWN]";
             var me      = "{0}::ModelProcessesState::_updateValidityState".fmt(iName);
 
             var success = false;
@@ -1187,7 +1187,7 @@
          *
          */
         _calcGlobalValidityState : function() {
-            var iName   = _.call(this, 'getIName') || "[UNKOWN]";
+            var iName   = _.exec(this, 'getIName') || "[UNKOWN]";
             var me      = "{0}::ModelProcessesState::_calcGlobalValidityState".fmt(iName);
 
             var globalValidityState = null;
@@ -1226,7 +1226,7 @@
             if (_.func(customFunc)) {
                 isEqual = customFunc(oldVal, newVal);
                 if (!_.bool(isEqual)) {
-                    var iName   = _.call(this, 'getIName') || "[UNKOWN]";
+                    var iName   = _.exec(this, 'getIName') || "[UNKOWN]";
                     var me      = "{0}::ModelProcessesState::_isEqual".fmt(iName);
 
                     _l.error(me, ("Custom method {0} did not return a " +
@@ -1284,7 +1284,7 @@
                 result.result = customFunc.call(this, value, callback);
                 result.called = true;
                 if (returnsBoolean && (!_.bool(result.result))) {
-                    var iName   = _.call(this, 'getIName') || "[UNKOWN]";
+                    var iName   = _.exec(this, 'getIName') || "[UNKOWN]";
                     var me      = "{0}::ModelProcessesState::_callCustomMethod".fmt(iName);
 
                     _l.warn(me, ("Custom method {0} did not return a " +

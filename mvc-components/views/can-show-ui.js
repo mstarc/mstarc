@@ -34,7 +34,7 @@
          *
          */
         showUI : function(show) {
-            var iName           = _.call(this, 'getIName') || "[UNKOWN]";
+            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
             var me              = "{0}::CanShowView::showUI".fmt(iName);
 
             if (!this.isValid()) {
