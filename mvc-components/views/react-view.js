@@ -192,14 +192,23 @@
             return (success = true);
         },
 
-        _renderState : function() {
+        _renderState : function(stateRenderedCb) {
             var me = "{0}::ReactView::_renderState".fmt(this.getIName());
+
+            var callbackGiven   = _.func(stateRenderedCb);
+
+            var __returnError   = function(errStr) {
+                callbackGiven ? stateRenderedCb({ message : errStr }) :  _l.error(me, errStr);
+            };
 
             var ui = this._getReactUIInstance();
             if (_.hasMethod(ui, "setState", "React UI Instance")) {
                 ui.setState(this._state);
+
+                //TODO : actually callback when state is rendered by React
+                if (callbackGiven) { stateRenderedCb(); }
             } else {
-                _l.error(me, "No valid React UI instance available, unable to render state");
+                __returnError("No valid React UI instance available, unable to render state");
             }
         },
 

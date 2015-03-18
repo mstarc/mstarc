@@ -17,16 +17,25 @@
 
     NS.ModelProcessesState = Class({
 
-        _state              : null,
-        _stateInitialized   : false,
+        $statics : {
+            REQUIRED_MODEL_API : {
+                methods : ['isValid', '_sync', '_dispatchToControllers']
+            }
+        },
+
+        _state                      : null,
+        _stateProcessingInitialized : false,
 
         /**
          *
-         * ModelProcessesState Mixin for Model classes. Adds functionality to process state in a
+         * ModelProcessesState Mixin for Model classes. Adds functionality to process, edit and sync state in a
          * standardized way.
          *
          *
          * IMPORTANT : Call _initStateProcessing() during construction of your class that uses this mixin
+         *
+         *
+         * IMPORTANT : The class that uses this mixin must have a _sync() method implemented
          *
          *
          * IMPORTANT : Almost all methods, including custom methods, have the following form:
@@ -37,6 +46,9 @@
          *
          * When actionInitiationSuccess is false the callback WILL NEVER be called.
          * Only when true is the callback ALWAYS called.
+         *
+         * TODO : stop using success return value, do everything through the callback.
+         * This better fits with the event processing function conventions and simplifies a lot of things.
          *
          *
          * *** TODO START : FUTURE : COMPLEX STATE ***
@@ -54,7 +66,12 @@
          *  * global error state
          *  * validity state of properties
          *
-         * The mixin exposes only two public method to edit and sync the data state:
+         * The mixin processes two types of incoming events :
+         *
+         * - wantToEdit
+         * - wantToSync
+         *
+         * For convenience these events can called using the following public methods:
          *
          *  edit(property, value, editProcessedCb)
          *  sync(syncReadyCb)
@@ -287,24 +304,49 @@
          * @param editProcessedCb   function(err), callback called when the edit has been processed throughout
          *                          the whole MVC
          *
-         * returns {boolean}        True if initiation of the edit was successful, false otherwise
-         *
          */
         edit : function(property, value, editProcessedCb) {
+            this.wantToEdit(
+                    this,
+                    {
+                        what : property,
+                        data : value
+                    },
+                    editProcessedCb);
+        },
+
+        wantToEdit : function(origin, data, editProcessedCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
             var me              = "{0}::ModelProcessesState::edit".fmt(iName);
 
-            editProcessedCb     = _.ensureFunc(editProcessedCb);
+            var dataUpdating    = false;
 
-            if (_.exec(this, "isValid") === false) {
-                _l.error(me, "Model is invalid, unable to edit");
-                return false;
+            var callbackGiven   = _.func(editProcessedCb);
+
+            var __returnError   = function(err) {
+                callbackGiven ? editProcessedCb(err) :  _l.error(me, "Error occurred : ", _.stringify(err));
+            };
+
+            if (!this._stateInitialized) {
+                __returnError({
+                    message : "State object is not initialized (correctly), call _initStateProcessing() in " +
+                              "your model-constructor first"
+                });
+                return;
             }
 
-            var finalError      = null;
-            var errHash         = null;
+            if (this.isValid() === false) {
+                __returnError({
+                    message : "Model is invalid, unable to edit"
+                });
+                return;
+            }
 
-            var dataUpdating    = false;
+            var dataDesc        = 'Data of wantToEdit event';
+            var property        = _.get(data, 'what', dataDesc);
+            var newValue        = _.get(data, 'data', dataDesc);
+
+            var errHash         = null;
 
             //Update Data State Callback called
             var udsCbCalled     = false;
@@ -313,7 +355,7 @@
 
             var finalCbCalled   = false;
 
-            var __callback  = function() {
+            var __finalCallback = function() {
                 if (dataUpdating && !(udsCbCalled && ptCbCalled)) {
                     return;
                 }
@@ -321,20 +363,20 @@
                 if (!finalCbCalled) {
                     finalCbCalled = true;
                 } else {
-                    _l.error(me, "UNEXPECTED : Callback already called, will not call again");
+                    _l.error(me, "UNEXPECTED : Final callback already called, will not call again");
                     return;
                 }
 
                 if (_.obj(errHash)) {
-                    finalError = {
-                        message : "One or more errors occurred editing property {0}".fmt(property),
-                        originalError : {
-                            error_hash : errHash
+                    __returnError({
+                        message: "One or more errors occurred editing property {0}".fmt(property),
+                        originalError: {
+                            error_hash: errHash
                         }
-                    };
+                    });
+                } else if (callbackGiven) {
+                    editProcessedCb();
                 }
-
-                editProcessedCb(finalError);
             };
 
             var __dataStateUpdatedCb = function(_err) {
@@ -345,7 +387,7 @@
                     errHash["update global sync state"] = _err;
                 }
 
-                __callback();
+                __finalCallback();
             };
 
             var __parallelTasksCb = function(_err) {
@@ -353,16 +395,15 @@
 
                 if (_.def(_err)) {
                     errHash = errHash || {};
-
                     errHash["update validity of property {0}".fmt(property)] = {
                         error_hash : _err
                     };
                 }
 
-                __callback();
+                __finalCallback();
             };
 
-            dataUpdating = this._updateDataState(property, value, __dataStateUpdatedCb);
+            dataUpdating = this._updateDataState(property, newValue, __dataStateUpdatedCb);
             if (dataUpdating) {
 
                 var parallelTasks = {};
@@ -376,7 +417,7 @@
                 };
 
                 parallelTasks["update validity of property {0}".fmt(property)] = function(cbReady) {
-                    var validity = this._callCustomMethod("validateProperty", property, value, false);
+                    var validity = this._callCustomMethod("validateProperty", property, newValue, false);
                     if (!this._updateValidityState(property, validity, cbReady)) {
                         cbReady({
                             message : "Problem initiating _updateValidityState"
@@ -387,63 +428,74 @@
                 _.execASync(parallelTasks, __parallelTasksCb)
 
             } else {
-                __callback();
+                __finalCallback();
             }
 
             return dataUpdating;
         },
 
-        sync : function(syncCb) {
+        sync : function(syncProcessedCb) {
+            this.wantToSync(
+                    this,
+                    null,
+                    syncProcessedCb);
+        },
+
+        wantToSync : function(origin, data, syncProcessedCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
             var me              = "{0}::ModelProcessesState::edit".fmt(iName);
             var self            = this;
 
-            var syncingStarted  = false;
+            var callbackGiven   = _.func(syncProcessedCb);
 
-            syncCb              = _.ensureFunc(syncCb);
-
-            if (_.exec(this, "isValid") === false) {
-                _l.error(me, "Model is invalid, unable to sync");
-                return syncingStarted;
-            }
+            var __returnError   = function(err) {
+                callbackGiven ? syncProcessedCb(err) :  _l.error(me, "Error occurred : ", _.stringify(err));
+            };
 
             if (!this._stateInitialized) {
-                _l.error(me, "State object is not initialized, call _initStateProcessing() in your constructor first");
-                return syncingStarted;
+                __returnError({
+                    message : "State object is not initialized (correctly), call _initStateProcessing() in " +
+                              "your model-constructor first"
+                });
+                return;
+            }
+
+            if (this.isValid() === false) {
+                __returnError({
+                    message : "Model is invalid, unable to sync"
+                });
+                return;
             }
 
             var validityState = this._state.globalValidity;
             if (!_.empty(validityState)) {
-                _l.error(me, "The following properties are invalid, unable to sync: {0}".fmt(validityState));
-                return syncingStarted;
+                _l.error(me, ("The following properties are invalid, " +
+                              "unable to sync: {0}").fmt(_.stringify(validityState)));
+                return;
             }
 
             var syncState = this._state.globalSyncing;
             if (syncState > SyncState.NOT_SYNCED) {
                 _l.info(me, "Syncing not required, global sync state is : {0}".fmt(SyncStateName[syncState]));
 
-                //Do in next runloop
-                setTimeout(syncCb, 0);
-
-                return (syncingStarted = true);
+                if (callbackGiven) { syncProcessedCb(); }
+                return;
             }
 
-            syncingStarted = this._sync(function(err) {
+            var syncingStarted = this._sync(function(err) {
                 if (_.def(err)) {
-                    syncCb(err);
+                    __returnError(err);
                     return;
                 }
 
-                self._updateGlobalSyncState(SyncState.SYNCED, syncCb);
+                self._updateGlobalSyncState(SyncState.SYNCED, syncProcessedCb);
             });
 
             if (!syncingStarted) {
-                syncCb({
+                __returnError({
                     message : "A problem occurred syncing, data was not synced"
                 });
             }
-
-            return syncingStarted;
         },
 
         /*********************************************************************
@@ -453,6 +505,16 @@
          *********************************************************************/
 
         _initStateProcessing : function() {
+            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
+            var me              = "{0}::ModelProcessesState::_initStateProcessing";
+
+            if (!_.interfaceAdheres(this, ModelProcessesState.REQUIRED_VIEW_API)) {
+                _l.error(me, "Init state processing failed : this model does not adhere to " +
+                             "the required interface for this mixin");
+                _.info(me, "Required model interface : ", _.stringify(ModelProcessesState.REQUIRED_MODEL_API));
+                return this._stateProcessingInitialized;
+            }
+
             this._state = {
                 //The actual state property values
                 data            : {},
@@ -467,7 +529,7 @@
                 validity        : {}
             };
 
-            this._stateInitialized = true;
+            return (this._stateProcessingInitialized = true);
         },
 
         /**
@@ -485,14 +547,15 @@
 
             var stateData       = null;
 
-            if (_.exec(this, "isValid") === false) {
-                _l.error(me, "Model is invalid, unable to getState");
+            if (!this._stateProcessingInitialized) {
+                _l.error(me, "State processing not initialized (correctly), call _initStateProcessing() in " +
+                             "your model-constructor first");
                 return stateData;
             }
 
-            if (!this._stateInitialized) {
-                _l.error(me, "State object is not initialized, call _initStateProcessing() in your constructor first");
-                return stateData;
+            if (this.isValid() === false) {
+                _l.error(me, "Model is invalid, unable to getState");
+                return;
             }
 
             if (!_.string(stateType) || _.empty(stateType)) {
@@ -501,17 +564,6 @@
             }
 
             return stateData;
-        },
-
-        _sync : function(cbSynced) {
-            var iName   = _.exec(this, 'getIName') || "[UNKOWN]";
-            var me      = "{0}::ModelProcessesState::_updateDataState".fmt(iName);
-
-            var success = false;
-
-            _l.error(me, "Method not implemented, please implement this method in your class");
-
-            return success;
         },
 
         /**
@@ -549,8 +601,9 @@
                 error_hash : {}
             };
 
-            if (!this._stateInitialized) {
-                _l.error(me, "State object is not initialized, call _initStateProcessing() in your constructor first");
+            if (!this._stateProcessingInitialized) {
+                _l.error(me, "State processing is not initialized (correctly), call _initStateProcessing() in " +
+                             "your model-constructor first");
                 return success;
             }
 
@@ -631,8 +684,9 @@
                 error_hash : {}
             };
 
-            if (!this._stateInitialized) {
-                _l.error(me, "State object is not initialized, call _initStateProcessing() in your constructor first");
+            if (!this._stateProcessingInitialized) {
+                _l.error(me, "State processing is not initialized (correctly), call _initStateProcessing() in " +
+                             "your model-constructor first");
                 return success;
             }
 
@@ -705,8 +759,9 @@
 
             var success = false;
 
-            if (!this._stateInitialized) {
-                _l.error(me, "State object is not initialized, call _initStateProcessing() in your constructor first");
+            if (!this._stateProcessingInitialized) {
+                _l.error(me, "State processing is not initialized (correctly), call _initStateProcessing() in
+                              your constructor first");
                 return success;
             }
 
@@ -757,8 +812,9 @@
 
             var globalSyncState = SyncState.SYNCED;
 
-            if (!this._stateInitialized) {
-                _l.error(me, "State object is not initialized, call _initStateProcessing() in your constructor first");
+            if (!this._stateProcessingInitialized) {
+                _l.error(me, "State processing is not initialized (correctly), call _initStateProcessing() in
+                              your constructor first");
                 return SyncState.UNKNOWN;
             }
 
@@ -813,8 +869,9 @@
                 error_hash : {}
             };
 
-            if (!this._stateInitialized) {
-                _l.error(me, "State object is not initialized, call _initStateProcessing() in your constructor first");
+            if (!this._stateProcessingInitialized) {
+                _l.error(me, "State processing is not initialized (correctly), call _initStateProcessing() in " +
+                             "your constructor first");
                 return success;
             }
 
@@ -894,8 +951,9 @@
                 error_hash : {}
             };
 
-            if (!this._stateInitialized) {
-                _l.error(me, "State object is not initialized, call _initStateProcessing() in your constructor first");
+            if (!this._stateProcessingInitialized) {
+                _l.error(me, "State processing is not initialized (correctly), call _initStateProcessing() in " +
+                             "your constructor first");
                 return success;
             }
 
@@ -974,8 +1032,9 @@
 
             var globalErrorState = null;
 
-            if (!this._stateInitialized) {
-                _l.error(me, "State object is not initialized, call _initStateProcessing() in your constructor first");
+            if (!this._stateProcessingInitialized) {
+                _l.error(me, "State processing is not initialized (correctly), call _initStateProcessing() in " +
+                             "your constructor first");
                 return globalErrorState;
             }
 
@@ -1030,8 +1089,9 @@
                 error_hash : {}
             };
 
-            if (!this._stateInitialized) {
-                _l.error(me, "State object is not initialized, call _initStateProcessing() in your constructor first");
+            if (!this._stateProcessingInitialized) {
+                _l.error(me, "State processing is not initialized (correctly), call _initStateProcessing() in " +
+                             "your constructor first");
                 return success;
             }
 
@@ -1109,8 +1169,9 @@
                 error_hash : {}
             };
 
-            if (!this._stateInitialized) {
-                _l.error(me, "State object is not initialized, call _initStateProcessing() in your constructor first");
+            if (!this._stateProcessingInitialized) {
+                _l.error(me, "State processing is not initialized (correctly), call _initStateProcessing() in " +
+                             "your constructor first");
                 return success;
             }
 
@@ -1192,8 +1253,9 @@
 
             var globalValidityState = null;
 
-            if (!this._stateInitialized) {
-                _l.error(me, "State object is not initialized, call _initStateProcessing() in your constructor first");
+            if (!this._stateProcessingInitialized) {
+                _l.error(me, "State processing is not initialized (correctly), call _initStateProcessing() in " +
+                             "your constructor first");
                 return globalValidityState;
             }
 

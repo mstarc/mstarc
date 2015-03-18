@@ -14,10 +14,18 @@
 
     NS.ControllerProcessesState = Class({
 
+        $statics : {
+            REQUIRED_CONTROLLER_API : {
+                methods : ['isValid', '_dispatchToModel', '_dispatchToView']
+            }
+        },
+
+        _stateProcessingInitialized : false,
+
         /**
          *
-         * ControllerProcessesState Mixin for Controller classes. Adds functionality to process state in a
-         * standardized way.
+         * ControllerProcessesState Mixin for Controller classes. Adds functionality to process, edit and sync
+         * state in a standardized way.
          *
          * This mixin provides functionality to process the following model events
          *
@@ -28,6 +36,11 @@
          *  - globalValidityStateUpdated
          *  - validityStateUpdated
          *
+         *  It also processes the following view events:
+         *  - wantToEdit
+         *  - wantToSync
+         *
+         * **Processing model events**
          * By default, the event and data is forwarded to the connected view.
          * However, the class using this mixin can define custom methods to:
          *
@@ -59,12 +72,28 @@
          *      forward : <boolean, true when the event with value needs to be forwarded to the view, else false>
          * }
          *
+         *
+         * **Processing view events**
+         * The class using this mixin can implement the following custom methods that are called when the view
+         * events are received:
+         *
+         * - onWantToEdit(property, value)
+         * - onWantToSync()
+         *
+         * These methods are called before the view events are forwarded to the connected model.
+         *
          * @class   ControllerProcessesState
          * @module  M*C
          *
          * @for     Controller
          *
          */
+
+        /********************************************************************
+         *
+         * MODEL EVENT HANDLERS
+         *
+         ********************************************************************/
 
         dataStateUpdated : function(model, data, eventProcessedCb) {
             this._processModelEvent(
@@ -115,11 +144,109 @@
                     arguments);
         },
 
+        /********************************************************************
+         *
+         * VIEW EVENT HANDLERS
+         *
+         ********************************************************************/
+
+        wantToEdit : function(view, data, editProcessedCb) {
+            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
+            var me              = "{0}::ControllerProcessesState::wantToEdit".fmt(iName);
+
+            var callbackGiven   = _.func(editProcessedCb);
+
+            var __returnError   = function(errStr) {
+                callbackGiven ? editProcessedCb({ message : errStr }) :  _l.error(me, errStr);
+            };
+
+            if (!this._stateProcessingInitialized) {
+                _l.error(me, "State processing is not initialized (correctly), call _initStateProcessing() in " +
+                             "your controller-constructor first");
+                return;
+            }
+
+            if (this.isValid() === false) {
+                __returnError("Controller is invalid, unable to edit property {0}".fmt(property));
+                return;
+            }
+
+            var dataDesc        = 'Data of wantToEdit event';
+            var property        = _.get(data, 'what', dataDesc);
+            var newValue        = _.get(data, 'data', dataDesc);
+
+            if (_.func(this._onWantToEdit)) {
+                this._onWantToEdit(property, newValue);
+            }
+
+            if (!_.func(this._dispatchToModel)) {
+                __returnError(("_dispatchToModel method missing : this is not a Controller class, " +
+                               "unable to edit property {0}").fmt(property));
+                return;
+            }
+
+            this._dispatchToModel(
+                    "wantToEdit",
+                    {
+                        what : property,
+                        value: newValue
+                    },
+                    editProcessedCb);
+        },
+
+        wantToSync : function(view, data, syncProcessedCb) {
+            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
+            var me              = "{0}::ControllerProcessesState::wantToSync".fmt(iName);
+
+            var callbackGiven   = _.func(syncProcessedCb);
+
+            var __returnError   = function(errStr) {
+                callbackGiven ? syncProcessedCb({ message : errStr }) :  _l.error(me, errStr);
+            };
+
+            if (!this._stateProcessingInitialized) {
+                _l.error(me, "State processing is not initialized (correctly), call _initStateProcessing() in " +
+                             "your controller-constructor first");
+                return;
+            }
+
+            if (this.isValid() === false) {
+                __returnError("Controller is invalid, unable to sync");
+                return;
+            }
+
+            if (_.func(this._onWantToSync)) {
+                this._onWantToSync(property, newValue);
+            }
+
+            this._dispatchToModel(
+                    "wantToSync",
+                    data,
+                    syncProcessedCb);
+        },
+
         /*********************************************************************
          *
          * PROTECTED METHODS
          *
          *********************************************************************/
+
+        _initStateProcessing : function() {
+            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
+            var me              = "{0}::ControllerProcessesState::_initStateProcessing";
+
+            if (!_.interfaceAdheres(this, ControllerProcessesState.REQUIRED_CONTROLLER_API)) {
+                _l.error(me, "Init state processing failed : this controller does not adhere to " +
+                             "the required interface for this mixin");
+
+                var api = ControllerProcessesState.REQUIRED_CONTROLLER_API;
+                _.info(me, "Required controller interface : ", _.stringify(api));
+
+                return this._stateProcessingInitialized;
+            }
+
+            return (this._stateProcessingInitialized = true);
+        },
 
         _processModelEvent : function(customProcessMethodName, eventName, isGlobal, processingArguments) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
@@ -138,7 +265,13 @@
                 callbackGiven ? eventProcessedCb({ message : errStr }) :  _l.error(me, errStr);
             };
 
-            if (_.exec(this, "isValid") === false) {
+            if (!this._stateProcessingInitialized) {
+                _l.error(me, "State processing is not initialized (correctly), call _initStateProcessing() in " +
+                             "your controller-constructor first");
+                return;
+            }
+
+            if (this.isValid() === false) {
                 __returnError("Controller is invalid, unable to process {0} event".fmt(eventName));
                 return;
             }
