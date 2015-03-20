@@ -39,6 +39,7 @@
          *  It also processes the following view events:
          *  - wantToEdit
          *  - wantToUpdateToRemote
+         *  - wantToUpdateFromRemote
          *
          * **Processing model events**
          * By default, the event and data is forwarded to the connected view.
@@ -79,8 +80,16 @@
          *
          * - _onWantToEdit(property, value)
          * - _onWantToUpdateToRemote()
+         * - _onWantToUpdateFromRemote()
          *
          * These methods are called before the view events are forwarded to the connected model.
+         *
+         * For convenience these events can called using the following public methods:
+         *
+         *  edit(property, value, editProcessedCb)      edit local property value
+         *  updateToRemote(updateReadyCb)               update local property values to server
+         *  updateFromRemote(updateReadyCb)             get remote property values from server
+         *
          *
          * @class   ControllerProcessesState
          * @module  M*C
@@ -150,7 +159,27 @@
          *
          ********************************************************************/
 
-        wantToEdit : function(view, data, editProcessedCb) {
+        /**
+         *
+         * Edit data <property> by setting it to a new <value>
+         *
+         * @param property          property for which to edit a value
+         * @param value             New value for property
+         * @param editProcessedCb   function(err), callback called when the edit has been processed throughout
+         *                          the whole MVC
+         *
+         */
+        edit : function(property, value, editProcessedCb) {
+            this.wantToEdit(
+                    this,
+                    {
+                        what : property,
+                        data : value
+                    },
+                    editProcessedCb);
+        },
+
+        wantToEdit : function(origin, data, editProcessedCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
             var me              = "{0}::ControllerProcessesState::wantToEdit".fmt(iName);
 
@@ -194,14 +223,21 @@
                     editProcessedCb);
         },
 
-        wantToUpdateToRemote : function(view, data, syncProcessedCb) {
+        updateToRemote : function(updateToRemoteCb) {
+            this.wantToUpdateToRemote(
+                    this,
+                    null,
+                    updateToRemoteCb);
+        },
+
+        wantToUpdateToRemote : function(origin, data, updateReadyCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
             var me              = "{0}::ControllerProcessesState::wantToUpdateToRemote".fmt(iName);
 
-            var callbackGiven   = _.func(syncProcessedCb);
+            var callbackGiven   = _.func(updateReadyCb);
 
             var __returnError   = function(errStr) {
-                callbackGiven ? syncProcessedCb({ message : errStr }) :  _l.error(me, errStr);
+                callbackGiven ? updateReadyCb({ message : errStr }) :  _l.error(me, errStr);
             };
 
             if (!this._stateProcessingInitialized) {
@@ -222,7 +258,45 @@
             this._dispatchToModel(
                     "wantToUpdateToRemote",
                     data,
-                    syncProcessedCb);
+                    updateReadyCb);
+        },
+
+        updateFromRemote : function(updateReadyCb) {
+            this.wantToUpdateFromRemote(
+                    this,
+                    null,
+                    updateReadyCb);
+        },
+
+        wantToUpdateFromRemote : function(origin, data, updateReadyCb) {
+            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
+            var me              = "{0}::ControllerProcessesState::wantToUpdateFromRemote".fmt(iName);
+
+            var callbackGiven   = _.func(updateReadyCb);
+
+            var __returnError   = function(errStr) {
+                callbackGiven ? updateReadyCb({ message : errStr }) :  _l.error(me, errStr);
+            };
+
+            if (!this._stateProcessingInitialized) {
+                __returnError("State processing is not initialized (correctly), call _initStateProcessing() in " +
+                "your controller-constructor first");
+                return;
+            }
+
+            if (this.isValid() === false) {
+                __returnError("Controller is invalid, unable to update to remote");
+                return;
+            }
+
+            if (_.func(this._onWantToUpdateFromRemote)) {
+                this._onWantToUpdateFromRemote(property, newValue);
+            }
+
+            this._dispatchToModel(
+                    "wantToUpdateFromRemote",
+                    data,
+                    updateReadyCb);
         },
 
         /*********************************************************************

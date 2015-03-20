@@ -19,7 +19,7 @@
 
         $statics : {
             REQUIRED_MODEL_API : {
-                methods : ['isValid', '_sync', '_dispatchToControllers']
+                methods : ['isValid', '_dispatchToControllers']
             }
         },
 
@@ -37,7 +37,10 @@
          * IMPORTANT : Call _initStateProcessing() during construction of your class that uses this mixin
          *
          *
-         * IMPORTANT : The class that uses this mixin must have a _sync() method implemented
+         * IMPORTANT : The class that uses this mixin must implement the following methods :
+         *
+         * - _updateToRemote(updateReadyCb), with updateReadyCb(err)
+         * - _updateFromRemote(updateReadyCb), with updateReadyCb(err)
          *
          *
          * IMPORTANT : Almost all methods, including custom methods, have the following form:
@@ -68,20 +71,12 @@
          *  * global error state
          *  * validity state of properties
          *
-         * //TODO : improve sync/update semantics
          * The mixin processes two types of incoming events :
          *
          * - wantToEdit
          * - wantToUpdateToRemote
          * - wantToUpdateFromRemote
          *
-         * For convenience these events can called using the following public methods:
-         *
-         *  edit(property, value, editProcessedCb)      edit local property value
-         *  updateToRemote(syncReadyCb)                 update local property values to server
-         *  update(updateReadyCb)                       get remote property values from server
-         *
-         * When the edit method is called, not only is the data <property> set to <value>, also the value is validated
          * if validation has been implemented for the property using a method with the following naming convention:
          *
          *  _validate<Property>(value)
@@ -100,6 +95,8 @@
          * the class that uses this mixin and implements the actual updating to the server.
          * When the updateToRemoteReadyCb(err) callback is called without error the globalSyncing is set to SYNCED.
          *
+         * The updateFromRemote()/wantToUpdateFromRemote() basically calls the _updateFromRemote() method if the
+         * global syncing state is SYNCED. This method needs to be implemented by the class that uses this mixin.
          *
          * Internally the state is structured as follows:
          * {
@@ -306,26 +303,6 @@
             return _.get(this._getState("validity"), property);
         },
 
-        /**
-         *
-         * Edit data <property> by setting it to a new <value>
-         *
-         * @param property          property for which to edit a value
-         * @param value             New value for property
-         * @param editProcessedCb   function(err), callback called when the edit has been processed throughout
-         *                          the whole MVC
-         *
-         */
-        edit : function(property, value, editProcessedCb) {
-            this.wantToEdit(
-                    this,
-                    {
-                        what : property,
-                        data : value
-                    },
-                    editProcessedCb);
-        },
-
         wantToEdit : function(origin, data, editProcessedCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
             var me              = "{0}::ModelProcessesState::edit".fmt(iName);
@@ -445,25 +422,18 @@
             return dataUpdating;
         },
 
-        updateToRemote : function(updateToRemoteCb) {
-            this.wantToUpdateToRemote(
-                    this,
-                    null,
-                    updateToRemoteCb);
-        },
-
-        wantToUpdateToRemote : function(origin, data, syncProcessedCb) {
+        wantToUpdateToRemote : function(origin, data, updateReadyCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
             var me              = "{0}::ModelProcessesState::wantToUpdateToRemote".fmt(iName);
             var self            = this;
 
-            var callbackGiven   = _.func(syncProcessedCb);
+            var callbackGiven   = _.func(updateReadyCb);
 
             var __returnError   = function(err) {
-                callbackGiven ? syncProcessedCb(err) :  _l.error(me, "Error occurred : ", _.stringify(err));
+                callbackGiven ? updateReadyCb(err) :  _l.error(me, "Error occurred : ", _.stringify(err));
             };
 
-            if (!this._stateInitialized) {
+            if (!this._stateProcessingInitialized) {
                 __returnError({
                     message : "State object is not initialized (correctly), call _initStateProcessing() in " +
                               "your model-constructor first"
@@ -489,22 +459,65 @@
             if (syncState > SyncState.NOT_SYNCED) {
                 _l.info(me, "Syncing not required, global sync state is : {0}".fmt(SyncStateName[syncState]));
 
-                if (callbackGiven) { syncProcessedCb(); }
+                if (callbackGiven) { updateReadyCb(); }
                 return;
             }
 
-            var syncingStarted = this._sync(function(err) {
+            var updatingStarted = this._updateToRemote(function(err) {
                 if (_.def(err)) {
                     __returnError(err);
                     return;
                 }
 
-                self._updateGlobalSyncState(SyncState.SYNCED, syncProcessedCb);
+                self._updateGlobalSyncState(SyncState.SYNCED, updateReadyCb);
             });
 
-            if (!syncingStarted) {
+            if (!updatingStarted) {
                 __returnError({
-                    message : "A problem occurred syncing, data was not synced"
+                    message : "A problem occurred updating data to the server, data was not synced"
+                });
+            }
+        },
+
+        wantToUpdateFromRemote : function(origin, data, updateReadyCb) {
+            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
+            var me              = "{0}::ModelProcessesState::wantToUpdateFromRemote".fmt(iName);
+            var self            = this;
+
+            var callbackGiven   = _.func(updateReadyCb);
+
+            var __returnError   = function(err) {
+                callbackGiven ? updateReadyCb(err) :  _l.error(me, "Error occurred : ", _.stringify(err));
+            };
+
+            if (!this._stateProcessingInitialized) {
+                __returnError({
+                    message : "State object is not initialized (correctly), call _initStateProcessing() in " +
+                              "your model-constructor first"
+                });
+                return;
+            }
+
+            if (this.isValid() === false) {
+                __returnError({
+                    message : "Model is invalid, unable to update to remote"
+                });
+                return;
+            }
+
+            var syncState = this._state.globalSyncing;
+            if (syncState < SyncState.SYNCED) {
+                _l.info(me, "There are local changes, update to server first.".fmt(SyncStateName[syncState]));
+
+                if (callbackGiven) { updateReadyCb(); }
+                return;
+            }
+
+            var updatingStarted = this._updateToRemote(updateReadyCb);
+
+            if (!updatingStarted) {
+                __returnError({
+                    message : "A problem occurred updating data from the server, data was not synced"
                 });
             }
         },
@@ -541,6 +554,34 @@
             };
 
             return (this._stateProcessingInitialized = true);
+        },
+
+        _updateFromRemote : function(updateReadyCb) {
+            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
+            var me              = "{0}::ModelProcessesState::_updateFromRemote".fmt(iName);
+
+            var errStr          = "_updateFromRemote method not implemented, " +
+                                  "please implement in your {0} class".fmt(iName);
+
+            _l.error(me, errStr);
+
+            _.ensureFunc(updateReadyCb)({
+                message : errStr
+            });
+        },
+
+        _updateToRemote : function(updateReadyCb) {
+            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
+            var me              = "{0}::ModelProcessesState::_updateToRemote".fmt(iName);
+
+            var errStr          = "_updateToRemote method not implemented, " +
+                                  "please implement in your {0} class".fmt(iName);
+
+            _l.error(me, errStr);
+
+            _.ensureFunc(updateReadyCb)({
+                message : errStr
+            });
         },
 
         /**
