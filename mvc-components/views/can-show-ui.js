@@ -21,12 +21,20 @@
          * This method assumes a _DOMContainer HTML element and a 'visible' class
          * that enables the container to be shown when added.
          *
+         * Also a wantToShowUI method is added to handle this showUI as an event
+         *
          * @class   CanShowUI
          * @module  M*C
          *
          * @for     View
          *
          */
+
+        wantToShowUI : function(origin, show, showReadyCb) {
+
+            this.showUI(show);
+
+        },
 
         /**
          *

@@ -28,6 +28,8 @@
 
         /**
          *
+         * TODO : DRY up code.
+         *
          * ModelProcessesState Mixin for Model classes. Adds functionality to process, edit and sync state in a
          * standardized way.
          *
@@ -66,20 +68,25 @@
          *  * global error state
          *  * validity state of properties
          *
+         * //TODO : improve sync/update semantics
          * The mixin processes two types of incoming events :
          *
          * - wantToEdit
-         * - wantToSync
+         * - wantToUpdateToRemote
+         * - wantToUpdateFromRemote
          *
          * For convenience these events can called using the following public methods:
          *
-         *  edit(property, value, editProcessedCb)
-         *  sync(syncReadyCb)
+         *  edit(property, value, editProcessedCb)      edit local property value
+         *  updateToRemote(syncReadyCb)                 update local property values to server
+         *  update(updateReadyCb)                       get remote property values from server
          *
          * When the edit method is called, not only is the data <property> set to <value>, also the value is validated
          * if validation has been implemented for the property using a method with the following naming convention:
          *
-         *  validateProperty<Property>(value)
+         *  _validate<Property>(value)
+         *
+         * This method must return a validity object, see below.
          *
          * TODO : Complex state syncing
          * Further, the global sync state is set to NOT_SYNCED when the new value for the property is
@@ -88,10 +95,10 @@
          *
          *  isEqual<Property>(val1, val2)
          *
-         * When the sync() method is called it is checked if globalSyncing is NOT_SYNCED.
-         * If so, the _sync(syncReadyCb) method is called. This method needs to be overridden by the class
-         * that uses this mixin and implements the actual syncing. When the syncReadyCb(err) callback is called
-         * without error the globalSyncing is set to SYNCED.
+         * When the updateToRemote() method is called it is checked if globalSyncing is NOT_SYNCED.
+         * If so, the _updateToRemote(updateToRemoteReadyCb) method is called. This method needs to be overridden by
+         * the class that uses this mixin and implements the actual updating to the server.
+         * When the updateToRemoteReadyCb(err) callback is called without error the globalSyncing is set to SYNCED.
          *
          *
          * Internally the state is structured as follows:
@@ -274,6 +281,10 @@
             return this._getState("globalValidity");
         },
 
+        allPropertiesValid : function() {
+            return _.empty(this.getGlobalValidityState());
+        },
+
         /**
          *
          * Get validity state for <property>
@@ -335,7 +346,7 @@
                 return;
             }
 
-            if (this.isValid() === false) {
+            if (!this.isValid()) {
                 __returnError({
                     message : "Model is invalid, unable to edit"
                 });
@@ -417,7 +428,7 @@
                 };
 
                 parallelTasks["update validity of property {0}".fmt(property)] = function(cbReady) {
-                    var validity = this._callCustomMethod("validateProperty", property, newValue, false);
+                    var validity = this._callCustomMethod("_validate", property, newValue, false);
                     if (!this._updateValidityState(property, validity, cbReady)) {
                         cbReady({
                             message : "Problem initiating _updateValidityState"
@@ -434,16 +445,16 @@
             return dataUpdating;
         },
 
-        sync : function(syncProcessedCb) {
-            this.wantToSync(
+        updateToRemote : function(updateToRemoteCb) {
+            this.wantToUpdateToRemote(
                     this,
                     null,
-                    syncProcessedCb);
+                    updateToRemoteCb);
         },
 
-        wantToSync : function(origin, data, syncProcessedCb) {
+        wantToUpdateToRemote : function(origin, data, syncProcessedCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
-            var me              = "{0}::ModelProcessesState::edit".fmt(iName);
+            var me              = "{0}::ModelProcessesState::wantToUpdateToRemote".fmt(iName);
             var self            = this;
 
             var callbackGiven   = _.func(syncProcessedCb);
@@ -462,7 +473,7 @@
 
             if (this.isValid() === false) {
                 __returnError({
-                    message : "Model is invalid, unable to sync"
+                    message : "Model is invalid, unable to update to remote"
                 });
                 return;
             }
@@ -470,7 +481,7 @@
             var validityState = this._state.globalValidity;
             if (!_.empty(validityState)) {
                 _l.error(me, ("The following properties are invalid, " +
-                              "unable to sync: {0}").fmt(_.stringify(validityState)));
+                              "unable to update to remote: {0}").fmt(_.stringify(validityState)));
                 return;
             }
 
@@ -830,7 +841,7 @@
                 }
 
                 syncState = syncing[property];
-                //Is this sync state most severe?
+                //Is this sync state more severe?
                 if (syncState < globalSyncState) {
                     globalSyncState = syncState;
                 }

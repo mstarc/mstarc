@@ -38,7 +38,7 @@
          *
          *  It also processes the following view events:
          *  - wantToEdit
-         *  - wantToSync
+         *  - wantToUpdateToRemote
          *
          * **Processing model events**
          * By default, the event and data is forwarded to the connected view.
@@ -77,8 +77,8 @@
          * The class using this mixin can implement the following custom methods that are called when the view
          * events are received:
          *
-         * - onWantToEdit(property, value)
-         * - onWantToSync()
+         * - _onWantToEdit(property, value)
+         * - _onWantToUpdateToRemote()
          *
          * These methods are called before the view events are forwarded to the connected model.
          *
@@ -161,8 +161,8 @@
             };
 
             if (!this._stateProcessingInitialized) {
-                _l.error(me, "State processing is not initialized (correctly), call _initStateProcessing() in " +
-                             "your controller-constructor first");
+                __returnError("State processing is not initialized (correctly), call _initStateProcessing() in " +
+                              "your controller-constructor first");
                 return;
             }
 
@@ -194,9 +194,9 @@
                     editProcessedCb);
         },
 
-        wantToSync : function(view, data, syncProcessedCb) {
+        wantToUpdateToRemote : function(view, data, syncProcessedCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
-            var me              = "{0}::ControllerProcessesState::wantToSync".fmt(iName);
+            var me              = "{0}::ControllerProcessesState::wantToUpdateToRemote".fmt(iName);
 
             var callbackGiven   = _.func(syncProcessedCb);
 
@@ -205,22 +205,22 @@
             };
 
             if (!this._stateProcessingInitialized) {
-                _l.error(me, "State processing is not initialized (correctly), call _initStateProcessing() in " +
-                             "your controller-constructor first");
+                __returnError("State processing is not initialized (correctly), call _initStateProcessing() in " +
+                              "your controller-constructor first");
                 return;
             }
 
             if (this.isValid() === false) {
-                __returnError("Controller is invalid, unable to sync");
+                __returnError("Controller is invalid, unable to update to remote");
                 return;
             }
 
-            if (_.func(this._onWantToSync)) {
-                this._onWantToSync(property, newValue);
+            if (_.func(this._onWantToUpdateToRemote)) {
+                this._onWantToUpdateToRemote(property, newValue);
             }
 
             this._dispatchToModel(
-                    "wantToSync",
+                    "wantToUpdateToRemote",
                     data,
                     syncProcessedCb);
         },
@@ -266,8 +266,8 @@
             };
 
             if (!this._stateProcessingInitialized) {
-                _l.error(me, "State processing is not initialized (correctly), call _initStateProcessing() in " +
-                             "your controller-constructor first");
+                __returnError("State processing is not initialized (correctly), call _initStateProcessing() in " +
+                              "your controller-constructor first");
                 return;
             }
 

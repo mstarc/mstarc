@@ -41,6 +41,11 @@
          *
          * A controller can only be connected to one view.
          *
+         * IMPORTANT :
+         *
+         * * When a view is connected to a controller and it is not rendered, the controller will call
+         *   render() on the view
+         *
          * DON'T FORGET:
          *
          * * When the component is ready to process events you need to call this._readyToProcessEvents()
@@ -164,6 +169,10 @@
                 this._model = processor;
             } else if (_.exec(processor, 'isView', processorName) === true) {
                 this._view = processor;
+
+                if (!this._view.isRendered()) {
+                    this._view.render();
+                }
             }
         },
 

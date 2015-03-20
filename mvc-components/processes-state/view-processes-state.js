@@ -55,7 +55,7 @@
          *
          * Further, it adds functionality to allow editing and syncing of data state.
          * When edit() is called a "wantToEdit" event is send to the connected controller.
-         * When sync() is called a "wantToSync" event is send to the connected controller.
+         * When updateToRemote() is called a "wantToUpdateToRemote" event is send to the connected controller.
          *
          * @class   ViewProcessesState
          * @module  M*C
@@ -66,7 +66,7 @@
 
         edit : function(property, newValue, editProcessedCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
-            var me              = "{0}::ViewEditsState::edit".fmt(iName);
+            var me              = "{0}::ViewProcessesState::edit".fmt(iName);
 
             var callbackGiven   = _.func(editProcessedCb);
 
@@ -96,9 +96,9 @@
                     editProcessedCb);
         },
 
-        sync : function(syncProcessedCb) {
+        updateToRemote : function(syncProcessedCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
-            var me              = "{0}::ViewEditsState::sync".fmt(iName);
+            var me              = "{0}::ViewProcessesState::updateToRemote".fmt(iName);
 
             var callbackGiven   = _.func(syncProcessedCb);
 
@@ -115,12 +115,12 @@
             }
 
             if (this.isValid() === false) {
-                __returnError("View is invalid, unable to sync");
+                __returnError("View is invalid, unable to update to remote");
                 return;
             }
 
             this._dispatchToController(
-                    "wantToSync",
+                    "wantToUpdateToRemote",
                     null,
                     syncProcessedCb);
         },

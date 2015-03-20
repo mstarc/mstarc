@@ -109,7 +109,7 @@
          *
          *  new mvcComponentClass(componentName, <arguments in extraArguments array>)
          *
-         * @method create
+         * @method createComponent
          *
          * @param {function} mvcComponentClass
          * @param {string} componentName
@@ -118,8 +118,8 @@
          * @returns {Object}                       Created component or null on error
          *
          */
-        create: function(mvcComponentClass, componentName, extraArguments) {
-            var me          = "{0}::Application::create".fmt(this.getIName());
+        createComponent: function(mvcComponentClass, componentName, extraArguments) {
+            var me          = "{0}::Application::createComponent".fmt(this.getIName());
             var component   = null;
 
             if (!_.func(mvcComponentClass)) {
