@@ -78,7 +78,7 @@
          *                                          instance if they not already exist. Also see Configurable mixin.
          *
          */
-        constructor: function (controllerName, stateManager, config) {
+        constructor: function(controllerName, stateManager, config) {
             var me = "Controller::constructor";
             NS.Controller.$super.call(this, controllerName, config);
 
@@ -189,6 +189,7 @@
          */
         _dispatchToModel : function(eventName, eventData, eventProcessedCb, throttle, throttleDelay) {
             var success = false;
+            var self    = this;
 
             if (!_.bool(throttle)) {
                 throttle = false;
@@ -198,7 +199,16 @@
             if (!throttle) {
                 success = this._dispatchEvent(m, eventName, eventData, eventProcessedCb);
             } else {
-                success = this._scheduleEventDispatch(m, eventName, eventData, eventProcessedCb, throttleDelay);
+                success = this._scheduleEventDispatch(
+                        m,
+                        eventName,
+                        eventData,
+                        eventProcessedCb,
+                        function() {
+                            var me = "{0}::Controller::_dispatchToModel".fmt(this.getIName());
+                            _l.info(me, "Processing of [{0}] by model was cancelled, doing nothing".fmt(eventName));
+                        },
+                        throttleDelay);
             }
 
             return success;
@@ -226,7 +236,16 @@
             if (!throttle) {
                 success = this._dispatchEvent(v, eventName, eventData, eventProcessedCb);
             } else {
-                success = this._scheduleEventDispatch(v, eventName, eventData, eventProcessedCb, throttleDelay);
+                success = this._scheduleEventDispatch(
+                        v,
+                        eventName,
+                        eventData,
+                        eventProcessedCb,
+                        function() {
+                            var me = "{0}::Controller::_dispatchToView".fmt(this.getIName());
+                            _l.info(me, "Processing of [{0}] by view was cancelled, doing nothing".fmt(eventName));
+                        },
+                        throttleDelay);
             }
 
             return success;

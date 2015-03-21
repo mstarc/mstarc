@@ -106,16 +106,70 @@
         },
 
         _dispatchToControllers : function(eventName, eventData, eventProcessedCb, throttle, throttleDelay) {
-            var success = false;
+            var me              = "{0}::Model::_dispatchToControllers".fmt(this.getIName());
+            var success         = false;
+
+            var err             = {
+                error_hash : {}
+            };
+
+            eventProcessedCb    = _.ensureFunc(eventProcessedCb);
 
             if (!_.bool(throttle)) {
                 throttle = false;
             }
 
+            var controllers     = this.getConnectedComponents();
+
+            var checkList       = {};
+            var controllerNames = {};
+            var numControllers  = 0;
+            var controller      = null;
+            for (var name in controllers) {
+                if (!controllers.hasOwnProperty(name)) {
+                    continue;
+                }
+
+                numControllers++;
+                controller                  = controllers[name];
+                checkList[controller]       = false;
+                controllerNames[controller]  = name;
+            }
+
+            var numUniqueControllersChecked = 0;
+            var __handleCallback = function(controller, cancelled, _err) {
+                var controllerName = controllerNames[controller] || "[UNKNOWN]";
+
+                if (checkList[controller] === true) {
+                    _l.error(me, ("UNEXPECTED : callback already called for processing " +
+                                  "of event [{0}] by processor {1}, doing nothing").fmt(eventName, controllerName));
+                    return;
+                }
+
+                if (cancelled === true) {
+                    _l.info(me, ("Cancelled processing of event [{0}] by processor [{0}], " +
+                                 "doing nothing").fmt(eventName, controllerName));
+                } else if (_.def(_err)) {
+                    var action = "Processing of event [{0}] by processor [{0}]".fmt(eventName, controllerName);
+                    err.error_hash[action] = _err;
+                }
+
+                checkList[controller] = true;
+                numUniqueControllersChecked++;
+
+                if (numUniqueControllersChecked == numControllers) {
+                    eventProcessedCb(!_.empty(err.error_hash) ? err : null);
+                }
+            };
+
             if (!throttle) {
-                success = this._dispatch(eventName, eventData, eventProcessedCb);
+                success = this._dispatch(eventName, eventData, function(controller, err) {
+                    __handleCallback(controller, false, err);
+                });
             } else {
-                success = this._dispatchThrottled(eventName, eventData, eventProcessedCb, throttleDelay);
+                success = this._dispatchThrottled(eventName, eventData, function(controller, cancelled, err) {
+                    __handleCallback(controller, cancelled, err);
+                }, throttleDelay);
             }
 
             return success;

@@ -32,7 +32,7 @@
 
         wantToShowUI : function(origin, show, showReadyCb) {
 
-            this.showUI(show);
+            this.showUI(show, showReadyCb);
 
         },
 
@@ -41,7 +41,7 @@
          * @param {boolean} [show = true]      Set to false to hide the UI
          *
          */
-        showUI : function(show) {
+        showUI : function(show, showReadyCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
             var me              = "{0}::CanShowView::showUI".fmt(iName);
 
@@ -64,6 +64,9 @@
             } else {
                 $(this._DOMContainer).removeClass("visible");
             }
+
+            //TODO : really wait for transition to complete?
+            _.ensureFunc(showReadyCb)();
         }
 
     });

@@ -20,7 +20,36 @@
          *
          * To handle event dispatch throttling
          *
-         * @property _throttleTimers
+         * @property {object} _throttleTimers   Structure is as follows:
+         *
+         * {
+         *      <processor instance i> : {
+         *                                  <event x> : <throttleTimer object>,
+         *
+         *                                  ...
+         *
+         *                                  <event y> : <throttleTimer object>
+         *                               }
+         *
+         *     ...
+         *
+         *      <processor instance j> : {
+         *                                  <event x> : <throttleTimer object>,
+         *
+         *                                  ...
+         *
+         *                                  <event y> : <throttleTimer object>
+         *                               }
+         *
+         * }
+         *
+         *
+         * Each throttleTimer object contains:
+         * {
+         *     timer         : <the timer>,
+         *     cancelledCb   : <callback called when cancelled>
+         * }
+         *
          * @protected
          *
          */
@@ -162,6 +191,29 @@
             return success;
         },
 
+        numberOfProcessorsRegistered : function() {
+            return (Object.getOwnPropertyNames(this._processors || {})).length;
+        },
+
+        /**
+         *
+         * @returns {object}    Returns hash with registered processors :
+         *
+         * {
+         *
+         *  <processor name1> : <processor instance1>,
+         *
+         *  ...
+         *
+         *  <processor nameN> : <processor instanceN>
+         *
+         * }
+         *
+         */
+        getRegisteredProcessors : function() {
+            return _.clone(this._processors);
+        },
+
         allowedToRegister : function(processor) {
             return true;
         },
@@ -199,19 +251,22 @@
          *                                          <err> is an error object when processing the event resulted in
          *                                          an error
          *
+         * @returns {boolean}                       True when dispatch was initiated successfully else false
+         *
          * @protected
          *
          */
         _dispatch : function(eventName, eventData, cbEventProcessed) {
             //var me      = "[{0}]::DispatchesEvents::_dispatch".fmt(_.exec(this, 'getIName') || '[UNKOWN]');
             var self    = this;
+            var success = true;
 
             this._processors = this._processors || {};
 
             cbEventProcessed = _.ensureFunc(cbEventProcessed);
 
             var __doDispatch = function(processor) {
-                self._dispatchEvent(processor, eventName, eventData, function(err) {
+                return self._dispatchEvent(processor, eventName, eventData, function(err) {
                     cbEventProcessed(processor, err);
                 });
             };
@@ -219,8 +274,10 @@
             var processor = null;
             for (var processorName in this._processors) {
                 processor = this._processors[processorName];
-                if (_.obj(processor)) { __doDispatch(processor); }
+                if (_.obj(processor)) { success = __doDispatch(processor) && success; }
             }
+
+            return success;
         },
 
         /**
@@ -240,7 +297,21 @@
          *
          * @param {string} eventName                Event name string
          * @param {object} eventData                Event data object
-         * @param {function} [cbEventProcessed]     See _dispatch method
+         * @param {function} [cbEventProcessed]     Optional callback called for each processor that
+         *                                          finished processing or for which processing was cancelled.
+         *                                          Callback signature:
+         *
+         *                                          function(processor, cancelled, err)
+         *
+         *                                          <processor> is the processor that finished processing the
+         *                                          dispatched event, or for which processing was cancelled
+         *
+         *                                          <cancelled> boolean, if true, processing was cancelled, else
+         *                                          false
+         *
+         *                                          <err> is an error object when processing the event resulted in
+         *                                          an error
+         *
          * @param {number} [throttleDelay]          Delay in milliseconds, see _scheduleEventDispatch for default value
          *
          * @protected
@@ -248,16 +319,31 @@
          */
         _dispatchThrottled : function(eventName, eventData, cbEventProcessed, throttleDelay) {
             //var me      = "[{0}]::DispatchesEvents::_dispatchThrottled".fmt(_.exec(this, 'getIName') || '[UNKOWN]');
+            var success   = true;
 
             this._processors = this._processors || {};
+
+            cbEventProcessed = _.ensureFunc(cbEventProcessed);
 
             var processor = null;
             for (var processorName in this._processors) {
                 processor = this._processors[processorName];
                 if (_.obj(processor)) {
-                    this._scheduleEventDispatch(processor, eventName, eventData, cbEventProcessed, throttleDelay);
+                    success = this._scheduleEventDispatch(
+                            processor,
+                            eventName,
+                            eventData,
+                            function(err) {
+                                cbEventProcessed(processor, false, err);
+                            },
+                            function() {
+                                cbEventProcessed(processor, true);
+                            },
+                            throttleDelay) && success;
                 }
             }
+
+            return success;
         },
 
         /**
@@ -281,7 +367,6 @@
          *
          * @protected
          */
-
         _dispatchEvent : function(processor, eventName, eventData, eventProcessedCb) {
             var success = false;
 
@@ -303,22 +388,25 @@
          *
          * See _dispatchThrottled for explanation about throttle mechanism
          *
-         * @param processor
-         * @param eventName
-         * @param eventData
-         * @param eventProcessedCb
+         * @param {object} processor
+         * @param {string} eventName
+         * @param {*} eventData
+         * @param {function} [eventProcessedCb]      function(err)
+         * @param {function} [cancelledCb]           function() Called for the given processor
+         *                                           when scheduled event processing was cancelled
          * @param [throttleDelay=300]
          *
          * @return {boolean} success
          *
          * @protected
+         *
          */
-        _scheduleEventDispatch : function(processor, eventName, eventData, eventProcessedCb, throttleDelay) {
+        _scheduleEventDispatch : function(processor, eventName, eventData, eventProcessedCb, cancelledCb, throttleDelay) {
             var success             = false;
             var self                = this;
 
-            this._processorsIndex   = this._processorsIndex || {};
-            this._throttleTimers    = this._throttleTimers || {};
+            this._processorsIndex  = this._processorsIndex || {};
+            this._throttleTimers   = this._throttleTimers || {};
 
             if ((!_.number(throttleDelay)) || (throttleDelay < 0)) {
                 throttleDelay = 300;
@@ -333,26 +421,39 @@
                 return success;
             }
 
-            var timer = this._throttleTimers[eventName];
+            this._throttleTimers[processor] = this._throttleTimers[processor] || {};
+
+            var timerInfo   = this._throttleTimers[processor][eventName];
+            var timer       = _.get(timerInfo, 'timer');
             if (_.def(timer)) {
                 clearTimeout(timer);
-                this._throttleTimers[eventName] = null;
+
+                //Call cancelledCb if provided
+                _.ensureFunc(timerInfo.cancelledCb)();
+
+                this._throttleTimers[processor][eventName]  = null;
+                timerInfo                                   = null;
             }
 
-            this._throttleTimers[eventName] = setTimeout(function() {
-                self._throttleTimers[eventName] = null;
+            this._throttleTimers[processor][eventName] = {
 
-                if (!processor.processEvent(self, eventName, eventData, eventProcessedCb)) {
+                cancelledCb : cancelledCb,
 
-                    var processorName  = self._processorsIndex[processor] || "[UNKNOWN]";
+                timer       : setTimeout(function() {
+                    self._throttleTimers[processor][eventName] = null;
 
-                    eventProcessedCb({
-                        message : "Unable to initiate processing of event {0} at processor {1}"
-                                  .fmt(eventName, processorName)
-                    });
+                    if (!processor.processEvent(self, eventName, eventData, eventProcessedCb)) {
 
-                }
-            }, throttleDelay);
+                        var processorName  = self._processorsIndex[processor] || "[UNKNOWN]";
+
+                        eventProcessedCb({
+                            message : "Unable to initiate processing of event {0} at processor {1}"
+                                    .fmt(eventName, processorName)
+                        });
+
+                    }
+                }, throttleDelay)
+            };
 
             return (success = true);
         },
@@ -361,4 +462,3 @@
 
     });
 })();
-

@@ -306,17 +306,21 @@
         wantToEdit : function(origin, data, editProcessedCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
             var me              = "{0}::ModelProcessesState::edit".fmt(iName);
-
-            var dataUpdating    = false;
+            var self            = this;
 
             var callbackGiven   = _.func(editProcessedCb);
-
-            var __returnError   = function(err) {
-                callbackGiven ? editProcessedCb(err) :  _l.error(me, "Error occurred : ", _.stringify(err));
+            var __return        = function(err) {
+                if (_.def(err)) {
+                    callbackGiven ? editProcessedCb(err) :
+                                    _l.error(me, "Error occurred : ", _.stringify(err));
+                } else {
+                    callbackGiven ? editProcessedCb() :
+                                    null;
+                }
             };
 
-            if (!this._stateInitialized) {
-                __returnError({
+            if (!this._stateProcessingInitialized) {
+                __return({
                     message : "State object is not initialized (correctly), call _initStateProcessing() in " +
                               "your model-constructor first"
                 });
@@ -324,7 +328,7 @@
             }
 
             if (!this.isValid()) {
-                __returnError({
+                __return({
                     message : "Model is invalid, unable to edit"
                 });
                 return;
@@ -334,92 +338,48 @@
             var property        = _.get(data, 'what', dataDesc);
             var newValue        = _.get(data, 'data', dataDesc);
 
-            var errHash         = null;
+            this._updateDataState(property, newValue, function(updated, _err) {
 
-            //Update Data State Callback called
-            var udsCbCalled     = false;
-            //Parallel tasks callback called
-            var ptCbCalled      = false;
-
-            var finalCbCalled   = false;
-
-            var __finalCallback = function() {
-                if (dataUpdating && !(udsCbCalled && ptCbCalled)) {
-                    return;
-                }
-
-                if (!finalCbCalled) {
-                    finalCbCalled = true;
-                } else {
-                    _l.error(me, "UNEXPECTED : Final callback already called, will not call again");
-                    return;
-                }
-
-                if (_.obj(errHash)) {
-                    __returnError({
-                        message: "One or more errors occurred editing property {0}".fmt(property),
-                        originalError: {
-                            error_hash: errHash
-                        }
+                if (_.def(_err)) {
+                    __return({
+                        message       : "Unable to update property [{0}] to edited value".fmt(property),
+                        originalError : _err
                     });
-                } else if (callbackGiven) {
-                    editProcessedCb();
-                }
-            };
-
-            var __dataStateUpdatedCb = function(_err) {
-                udsCbCalled = true;
-
-                if (_.def(_err)) {
-                    errHash = errHash || {};
-                    errHash["update global sync state"] = _err;
+                    return;
                 }
 
-                __finalCallback();
-            };
-
-            var __parallelTasksCb = function(_err) {
-                ptCbCalled = true;
-
-                if (_.def(_err)) {
-                    errHash = errHash || {};
-                    errHash["update validity of property {0}".fmt(property)] = {
-                        error_hash : _err
-                    };
+                if (!updated) {
+                    _l.debug(me, "Property [{0}] was not updated, stopping");
+                    return;
                 }
-
-                __finalCallback();
-            };
-
-            dataUpdating = this._updateDataState(property, newValue, __dataStateUpdatedCb);
-            if (dataUpdating) {
 
                 var parallelTasks = {};
 
                 parallelTasks["update global sync state"] = function(cbReady) {
-                    if (!this._updateGlobalSyncState(SyncState.NOT_SYNCED, cbReady)) {
-                        cbReady({
-                            message : "Problem initiating _updateGlobalSyncState"
-                        });
-                    }
+                    self._updateGlobalSyncState(SyncState.NOT_SYNCED, function(updated, err) {
+                        cbReady(err)
+                    });
                 };
 
                 parallelTasks["update validity of property {0}".fmt(property)] = function(cbReady) {
-                    var validity = this._callCustomMethod("_validate", property, newValue, false);
-                    if (!this._updateValidityState(property, validity, cbReady)) {
-                        cbReady({
-                            message : "Problem initiating _updateValidityState"
-                        });
-                    }
+                    var result = self._callCustomMethod("_validate", property, newValue, null, false);
+                    self._updateValidityState(property, result.result, function(updated, err) {
+                        cbReady(err);
+                    });
                 };
 
-                _.execASync(parallelTasks, __parallelTasksCb)
+                _.execASync(parallelTasks, function(errHash) {
+                    if (!_.empty(errHash)) {
+                        __return({
+                            error_hash : errHash
+                        });
+                        return;
+                    }
 
-            } else {
-                __finalCallback();
-            }
+                    __return();
+                });
 
-            return dataUpdating;
+            });
         },
 
         wantToUpdateToRemote : function(origin, data, updateReadyCb) {
@@ -463,20 +423,16 @@
                 return;
             }
 
-            var updatingStarted = this._updateToRemote(function(err) {
+            this._updateToRemote(function(err) {
                 if (_.def(err)) {
                     __returnError(err);
                     return;
                 }
 
-                self._updateGlobalSyncState(SyncState.SYNCED, updateReadyCb);
-            });
-
-            if (!updatingStarted) {
-                __returnError({
-                    message : "A problem occurred updating data to the server, data was not synced"
+                self._updateGlobalSyncState(SyncState.SYNCED, function(updated, err) {
+                    updateReadyCb(err);
                 });
-            }
+            });
         },
 
         wantToUpdateFromRemote : function(origin, data, updateReadyCb) {
@@ -513,13 +469,7 @@
                 return;
             }
 
-            var updatingStarted = this._updateToRemote(updateReadyCb);
-
-            if (!updatingStarted) {
-                __returnError({
-                    message : "A problem occurred updating data from the server, data was not synced"
-                });
-            }
+            this._updateFromRemote(updateReadyCb);
         },
 
         /*********************************************************************
@@ -532,10 +482,10 @@
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
             var me              = "{0}::ModelProcessesState::_initStateProcessing";
 
-            if (!_.interfaceAdheres(this, ModelProcessesState.REQUIRED_VIEW_API)) {
+            if (!_.interfaceAdheres(this, ModelProcessesState.REQUIRED_MODEL_API)) {
                 _l.error(me, "Init state processing failed : this model does not adhere to " +
                              "the required interface for this mixin");
-                _.info(me, "Required model interface : ", _.stringify(ModelProcessesState.REQUIRED_MODEL_API));
+                _l.info(me, "Required model interface : ", _.stringify(ModelProcessesState.REQUIRED_MODEL_API));
                 return this._stateProcessingInitialized;
             }
 
@@ -546,10 +496,10 @@
                 globalSyncing   : SyncState.UNKNOWN,
                 syncing         : {},
 
-                globalError     : null,
+                globalError     : this._calcGlobalErrorState(),
                 error           : {},
 
-                globalValidity  : null,
+                globalValidity  : this._calcGlobalValidityState(),
                 validity        : {}
             };
 
@@ -638,45 +588,55 @@
          *                                          When updated is false and err is not an object, no update was
          *                                          performed because the value didn't change.
          *
-         * @returns {boolean}                       True if update was initiated successfully, false otherwise.
-         *
          * @protected
          *
          */
         _updateDataState : function(property, value, updateProcessedCb) {
             var iName   = _.exec(this, 'getIName') || "[UNKOWN]";
             var me      = "{0}::ModelProcessesState::_updateDataState".fmt(iName);
+            var self    = this;
 
-            var success = false;
             var updated = false;
             var err     = {
                 error_hash : {}
             };
 
+            var callbackGiven   = _.func(updateProcessedCb);
+            var __return        = function(err) {
+                if (_.def(err)) {
+                    callbackGiven ? updateProcessedCb(updated, err) :
+                                    _l.error(me, "Error occurred : ", _.stringify(err));
+                } else {
+                    callbackGiven ? updateProcessedCb(updated) :
+                                    null;
+                }
+            };
+
             if (!this._stateProcessingInitialized) {
-                _l.error(me, "State processing is not initialized (correctly), call _initStateProcessing() in " +
-                             "your model-constructor first");
-                return success;
+                __return({
+                    message : "State processing is not initialized (correctly), call _initStateProcessing() in " +
+                              "your model-constructor first"
+                });
+                return;
             }
 
             if (!_.string(property) || _.empty(property)) {
-                _l.error(me, "Property is not valid, unable to update data state and notify controllers");
-                return success;
+                __return({
+                    message : "Property is not valid, unable to update data state and notify controllers"
+                });
+                return;
             }
-
-            updateProcessedCb = _.ensureFunc(updateProcessedCb);
 
             if (this._isEqual(property, this._state.data[property], value)) {
                 _l.debug(me, "Value for property {0} did not change, nothing to update".fmt(property));
-                //In next runloop, callback without error but with updated = false
-                setTimeout(function() { updateProcessedCb(updated, err); }, 0);
-                return (success = true);
+                __return();
+                return;
             }
 
             this._state.data[property] = value;
             updated = true;
 
-            success = this._dispatchToControllers("dataStateUpdated", {
+            this._dispatchToControllers("dataStateUpdated", {
                 what : property,
                 data : value
             }, function(_err) {
@@ -684,26 +644,24 @@
                     err.error_hash["dispatched dataStateUpdated to controllers"] = _err;
                 }
 
-                var result = this._callCustomMethod("_updateDataStateFor", property, value, function(_err) {
+                var result = self._callCustomMethod("_updateDataStateFor", property, value, function(_err) {
                     if (_.def(_err)) {
                         err.error_hash["calling custom method _updateDataStateFor {0}".fmt(property)] = _err;
                     }
 
-                    updateProcessedCb(updated, !_.empty(err.error_hash) ? err : null);
+                    __return(!_.empty(err.error_hash) ? err : null);
                 });
 
                 if (!result.called) {
-                    updateProcessedCb(updated, !_.empty(err.error_hash) ? err : null);
+                    __return(!_.empty(err.error_hash) ? err : null);
                 } else if (result.result !== true) {
                     err.error_hash["initiating custom method _updateDataStateFor {0}".fmt(property)] = {
                         message : "A problem occurred initiating custom method"
                     };
 
-                    updateProcessedCb(updated, err);
+                    __return(err);
                 }
             });
-
-            return success;
         },
 
         /**
@@ -721,64 +679,70 @@
          *                                          When updated is false and err is not an object, no update was
          *                                          performed because the value didn't change.
          *
-         * @returns {boolean}                       True if update was initiated successfully, false otherwise.
-         *
          * @protected
          *
          */
         _updateGlobalSyncState : function(value, updateProcessedCb) {
             var iName   = _.exec(this, 'getIName') || "[UNKOWN]";
             var me      = "{0}::ModelProcessesState::_updateGlobalSyncState".fmt(iName);
+            var self    = this;
 
-            var success = false;
             var updated = false;
             var err     = {
                 error_hash : {}
             };
 
-            if (!this._stateProcessingInitialized) {
-                _l.error(me, "State processing is not initialized (correctly), call _initStateProcessing() in " +
-                             "your model-constructor first");
-                return success;
-            }
+            var callbackGiven   = _.func(updateProcessedCb);
+            var __return        = function(err) {
+                if (_.def(err)) {
+                    callbackGiven ? updateProcessedCb(updated, err) :
+                            _l.error(me, "Error occurred : ", _.stringify(err));
+                } else {
+                    callbackGiven ? updateProcessedCb(updated) :
+                            null;
+                }
+            };
 
-            updateProcessedCb = _.ensureFunc(updateProcessedCb);
+            if (!this._stateProcessingInitialized) {
+                __return({
+                    message : "State processing is not initialized (correctly), call _initStateProcessing() in " +
+                              "your model-constructor first"
+                });
+                return;
+            }
 
             if (_.equals(this._state.globalSyncing, value)) {
                 _l.debug(me, "Value for global sync state did not change, nothing to update");
-                //In next runloop, callback without error but with updated = false
-                setTimeout(function() { updateProcessedCb(updated); }, 0);
-                return (success = true);
+                __return();
+                return;
             }
 
             this._state.globalSyncing = value;
             updated = true;
 
-            success = this._dispatchToControllers("globalSyncStateUpdated", value, function(_err) {
+            this._dispatchToControllers("globalSyncStateUpdated", value, function(_err) {
                 if (_.def(_err)) {
                     err.error_hash["dispatched globalSyncStateUpdated to controllers"] = _err;
                 }
 
-                var result = this._callCustomMethod("_globalSyncStateUpdated", "", value, function(_err) {
+                var result = self._callCustomMethod("_globalSyncStateUpdated", "", value, function(_err) {
                     if (_.def(_err)) {
                         err.error_hash["calling custom method _globalSyncStateUpdated"] = _err;
                     }
 
-                    updateProcessedCb(updated, !_.empty(err.error_hash) ? err : null);
+                    __return(!_.empty(err.error_hash) ? err : null);
                 });
 
                 if (!result.called) {
-                    updateProcessedCb(updated, !_.empty(err.error_hash) ? err : null);
+                    __return(!_.empty(err.error_hash) ? err : null);
                 } else if (result.result !== false) {
                     err.error_hash["initiating custom method _globalSyncStateUpdated"] = {
                         message : "A problem occurred initiating custom method"
                     };
 
-                    updateProcessedCb(updated, err);
+                    __return(err);
                 }
             });
-
-            return success;
         },
 
         //TODO : complex state
@@ -906,64 +870,70 @@
          *                                          When updated is false and err is not an object, no update was
          *                                          performed because the value didn't change.
          *
-         * @returns {boolean}                       True if update was initiated successfully, false otherwise.
-         *
          * @protected
          *
          */
         _updateGlobalErrorState : function(value, updateProcessedCb) {
             var iName   = _.exec(this, 'getIName') || "[UNKOWN]";
             var me      = "{0}::ModelProcessesState::_updateGlobalErrorState".fmt(iName);
+            var self    = this;
 
-            var success = false;
             var updated = false;
             var err     = {
                 error_hash : {}
             };
 
-            if (!this._stateProcessingInitialized) {
-                _l.error(me, "State processing is not initialized (correctly), call _initStateProcessing() in " +
-                             "your constructor first");
-                return success;
-            }
+            var callbackGiven   = _.func(updateProcessedCb);
+            var __return        = function(err) {
+                if (_.def(err)) {
+                    callbackGiven ? updateProcessedCb(updated, err) :
+                            _l.error(me, "Error occurred : ", _.stringify(err));
+                } else {
+                    callbackGiven ? updateProcessedCb(updated) :
+                            null;
+                }
+            };
 
-            updateProcessedCb = _.ensureFunc(updateProcessedCb);
+            if (!this._stateProcessingInitialized) {
+                __return({
+                    message : "State processing is not initialized (correctly), call _initStateProcessing() in " +
+                              "your model-constructor first"
+                });
+                return;
+            }
 
             if (_.equals(this._state.globalError, value)) {
                 _l.debug(me, "Value for global error state did not change, nothing to update");
-                //In next runloop, callback without error but with updated = false
-                setTimeout(function() { updateProcessedCb(updated); }, 0);
-                return (success = true);
+                __return();
+                return;
             }
 
             this._state.globalError = value;
             updated = true;
 
-            success = this._dispatchToControllers("globalErrorStateUpdated", value, function(_err) {
+            this._dispatchToControllers("globalErrorStateUpdated", value, function(_err) {
                 if (_.def(_err)) {
                     err.error_hash["dispatched globalErrorStateUpdated to controllers"] = _err;
                 }
 
-                var result = this._callCustomMethod("_globalErrorStateUpdated", "", value, function(_err) {
+                var result = self._callCustomMethod("_globalErrorStateUpdated", "", value, function(_err) {
                     if (_.def(_err)) {
                         err.error_hash["calling custom method _globalErrorStateUpdated"] = _err;
                     }
 
-                    updateProcessedCb(updated, !_.empty(err.error_hash) ? err : null);
+                    __return(!_.empty(err.error_hash) ? err : null);
                 });
 
                 if (!result.called) {
-                    updateProcessedCb(updated, !_.empty(err.error_hash) ? err : null);
+                    __return(!_.empty(err.error_hash) ? err : null);
                 } else if (result.result !== false) {
                     err.error_hash["initiating custom method _globalErrorStateUpdated"] = {
                         message : "A problem occurred initiating custom method _globalErrorStateUpdated"
                     };
 
-                    updateProcessedCb(updated, err);
+                    __return(err);
                 }
             });
-
-            return success;
         },
 
         /**
@@ -987,8 +957,6 @@
          *                                          When updated is false and err is not an object, no update was
          *                                          performed because the value didn't change.
          *
-         * @returns {boolean}                       True if update was initiated successfully, false otherwise.
-         *
          * @protected
          *
          */
@@ -997,36 +965,47 @@
             var me      = "{0}::ModelProcessesState::_updateErrorState".fmt(iName);
             var self    = this;
 
-            var success = false;
             var updated = false;
             var err     = {
                 error_hash : {}
             };
 
+            var callbackGiven   = _.func(updateProcessedCb);
+            var __return        = function(err) {
+                if (_.def(err)) {
+                    callbackGiven ? updateProcessedCb(updated, err) :
+                            _l.error(me, "Error occurred : ", _.stringify(err));
+                } else {
+                    callbackGiven ? updateProcessedCb(updated) :
+                            null;
+                }
+            };
+
             if (!this._stateProcessingInitialized) {
-                _l.error(me, "State processing is not initialized (correctly), call _initStateProcessing() in " +
-                             "your constructor first");
-                return success;
+                __return({
+                    message : "State processing is not initialized (correctly), call _initStateProcessing() in " +
+                              "your model-constructor first"
+                });
+                return;
             }
 
             if (!_.string(property) || _.empty(property)) {
-                _l.error(me, "Property is not valid, unable to update error state and notify controllers");
-                return success;
+                __return({
+                    message : "Property is not valid, unable to update error state and notify controllers"
+                });
+                return;
             }
-
-            updateProcessedCb = _.ensureFunc(updateProcessedCb);
 
             if (_.equals(this._state.error[property], value)) {
                 _l.debug(me, "Value for error state of property {0} did not change, nothing to update".fmt(property));
-                //In next runloop, callback without error but with updated = false
-                setTimeout(function() { updateProcessedCb(updated); }, 0);
-                return (success = true);
+                __return();
+                return;
             }
 
             this._state.error[property] = value;
             updated = true;
 
-            success = this._dispatchToControllers("errorStateUpdated", {
+            this._dispatchToControllers("errorStateUpdated", {
                 what : property,
                 data : value
             }, function(_err) {
@@ -1034,7 +1013,7 @@
                     err.error_hash["dispatched errorStateUpdated to controllers"] = _err;
                 }
 
-                var initSuccess = self._updateGlobalErrorState(self._calcGlobalErrorState(), function(_updated, _err) {
+                self._updateGlobalErrorState(self._calcGlobalErrorState(), function(_updated, _err) {
                     if (_.def(_err)) {
                         err.error_hash["updating globalErrorState"] = _err;
                     }
@@ -1044,30 +1023,20 @@
                             err.error_hash["calling custom method _errorStateUpdatedFor {0}".fmt(property)] = _err;
                         }
 
-                        updateProcessedCb(updated, !_.empty(err.error_hash) ? err : null);
+                        __return(!_.empty(err.error_hash) ? err : null);
                     });
 
                     if (!result.called) {
-                        updateProcessedCb(updated, !_.empty(err.error_hash) ? err : null);
+                        __return(!_.empty(err.error_hash) ? err : null);
                     } else if (result.result === false) {
                         err.error_hash["Initiating custom method _errorStateUpdatedFor {0}".fmt(property)] = {
                             message : "Problem occurred initiating"
                         };
 
-                        updateProcessedCb(updated, err);
+                        __return(err);
                     }
                 });
-
-                if (!initSuccess) {
-                    err.error_hash["Initiating _updateGlobalErrorState"] = {
-                        message : "Problem occurred initiating _updateGlobalErrorState"
-                    };
-
-                    updateProcessedCb(updated, err);
-                }
             });
-
-            return success;
         },
 
         /**
@@ -1126,64 +1095,70 @@
          *                                          When updated is false and err is not an object, no update was
          *                                          performed because the value didn't change.
          *
-         * @returns {boolean}                       True if update was initiated successfully, false otherwise.
-         *
          * @protected
          *
          */
         _updateGlobalValidityState : function(value, updateProcessedCb) {
             var iName   = _.exec(this, 'getIName') || "[UNKOWN]";
             var me      = "{0}::ModelProcessesState::_updateGlobalValidityState".fmt(iName);
+            var self    = this;
 
-            var success = false;
             var updated = false;
             var err     = {
                 error_hash : {}
             };
 
-            if (!this._stateProcessingInitialized) {
-                _l.error(me, "State processing is not initialized (correctly), call _initStateProcessing() in " +
-                             "your constructor first");
-                return success;
-            }
+            var callbackGiven   = _.func(updateProcessedCb);
+            var __return        = function(err) {
+                if (_.def(err)) {
+                    callbackGiven ? updateProcessedCb(updated, err) :
+                            _l.error(me, "Error occurred : ", _.stringify(err));
+                } else {
+                    callbackGiven ? updateProcessedCb(updated) :
+                            null;
+                }
+            };
 
-            updateProcessedCb = _.ensureFunc(updateProcessedCb);
+            if (!this._stateProcessingInitialized) {
+                __return({
+                    message : "State processing is not initialized (correctly), call _initStateProcessing() in " +
+                              "your model-constructor first"
+                });
+                return;
+            }
 
             if (_.equals(this._state.globalValidity, value)) {
                 _l.debug(me, "Value for global error state did not change, nothing to update");
-                //In next runloop, callback without error but with updated = false
-                setTimeout(function() { updateProcessedCb(updated); }, 0);
-                return (success = true);
+                __return();
+                return;
             }
 
             this._state.globalValidity = value;
             updated = true;
 
-            success = this._dispatchToControllers("globalValidityStateUpdated", value, function(_err) {
+            this._dispatchToControllers("globalValidityStateUpdated", value, function(_err) {
                 if (_.def(_err)) {
                     err.error_hash["dispatched globalValidityStateUpdated to controllers"] = _err;
                 }
 
-                var result = this._callCustomMethod("_globalValidityStateUpdated", "", value, function(_err) {
+                var result = self._callCustomMethod("_globalValidityStateUpdated", "", value, function(_err) {
                     if (_.def(_err)) {
                         err.error_hash["calling custom method _globalValidityStateUpdated"] = _err;
                     }
 
-                    updateProcessedCb(updated, !_.empty(err.error_hash) ? err : null);
+                    __return(!_.empty(err.error_hash) ? err : null);
                 });
 
                 if (!result.called) {
-                    updateProcessedCb(updated, !_.empty(err.error_hash) ? err : null);
+                    __return(!_.empty(err.error_hash) ? err : null);
                 } else if (result.result !== false) {
                     err.error_hash["initiating custom method _globalValidityStateUpdated"] = {
                         message : "A problem occurred initiating"
                     };
 
-                    updateProcessedCb(updated, err);
+                    __return(err);
                 }
             });
-
-            return success;
         },
 
         /**
@@ -1206,30 +1181,44 @@
          *                                          When updated is false and err is not an object, no update was
          *                                          performed because the value didn't change.
          *
-         * @returns {boolean}                       True if update was initiated successfully, false otherwise.
-         *
          * @protected
          *
          */
         _updateValidityState : function(property, value, updateProcessedCb) {
             var iName   = _.exec(this, 'getIName') || "[UNKOWN]";
             var me      = "{0}::ModelProcessesState::_updateValidityState".fmt(iName);
+            var self    = this;
 
-            var success = false;
             var updated = false;
             var err     = {
                 error_hash : {}
             };
 
+            var callbackGiven   = _.func(updateProcessedCb);
+            var __return        = function(err) {
+                if (_.def(err)) {
+                    callbackGiven ? updateProcessedCb(updated, err) :
+                            _l.error(me, "Error occurred : ", _.stringify(err));
+                } else {
+                    callbackGiven ? updateProcessedCb(updated) :
+                            null;
+                }
+            };
+
             if (!this._stateProcessingInitialized) {
-                _l.error(me, "State processing is not initialized (correctly), call _initStateProcessing() in " +
-                             "your constructor first");
-                return success;
+                __return({
+                    message : "State processing is not initialized (correctly), call _initStateProcessing() in " +
+                              "your model-constructor first"
+                });
+                return;
             }
 
+
             if (!_.string(property) || _.empty(property)) {
-                _l.error(me, "Property is not valid, unable to update validity state and notify controllers");
-                return success;
+                __return({
+                    message : "Property is not valid, unable to update validity state and notify controllers"
+                });
+                return;
             }
 
             updateProcessedCb = _.ensureFunc(updateProcessedCb);
@@ -1237,15 +1226,14 @@
             if (_.equals(this._state.validity[property], value)) {
                 _l.debug(me, ("Value for validity state of property {0} did not change, " +
                               "nothing to update").fmt(property));
-                //In next runloop, callback without error but with updated = false
-                setTimeout(function() { updateProcessedCb(updated); }, 0);
-                return (success = true);
+                __return();
+                return;
             }
 
             this._state.validity[property] = value;
             updated = true;
 
-            success = this._dispatchToControllers("validityStateUpdated", {
+            this._dispatchToControllers("validityStateUpdated", {
                 what : property,
                 data : value
             }, function(_err) {
@@ -1253,7 +1241,7 @@
                     err.error_hash["dispatched validityStateUpdated to controllers"] = _err;
                 }
 
-                var initSuccess = self._updateGlobalValidityState(self._calcGlobalValidityState(), function(_updated, _err) {
+                self._updateGlobalValidityState(self._calcGlobalValidityState(), function(_updated, _err) {
                     if (_.def(_err)) {
                         err.error_hash["updating globalValidityState"] = _err;
                     }
@@ -1263,7 +1251,7 @@
                             err.error_hash["calling custom method _validityStateUpdatedFor {0}".fmt(property)] = _err;
                         }
 
-                        updateProcessedCb(updated, !_.empty(err.error_hash) ? err : null);
+                        __return(!_.empty(err.error_hash) ? err : null);
                     });
 
                     if (!result.called) {
@@ -1273,22 +1261,11 @@
                             message : "Problem occurred initiating"
                         };
 
-                        updateProcessedCb(updated, err);
+                        __return(err);
                     }
                 });
-
-                if (!initSuccess) {
-                    err.error_hash["Initiating _updateGlobalValidityState"] = {
-                        message : "Problem occurred initiating"
-                    };
-
-                    updateProcessedCb(updated, err);
-                }
             });
-
-            return success;
         },
-
 
         /**
          *

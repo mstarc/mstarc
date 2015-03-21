@@ -91,7 +91,7 @@
                     "wantToEdit",
                     {
                         what : property,
-                        value: newValue
+                        data : newValue
                     },
                     editProcessedCb);
         },

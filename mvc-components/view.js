@@ -216,7 +216,16 @@
             if (!throttle) {
                 success = this._dispatchEvent(c, eventName, eventData, eventProcessedCb);
             } else {
-                success = this._scheduleEventDispatch(c, eventName, eventData, eventProcessedCb, throttleDelay);
+                success = this._scheduleEventDispatch(
+                        c,
+                        eventName,
+                        eventData,
+                        eventProcessedCb,
+                        function() {
+                            var me = "{0}::View::_dispatchToController".fmt(this.getIName());
+                            _l.info(me, "Processing of [{0}] by controller was cancelled, doing nothing".fmt(eventName));
+                        },
+                        throttleDelay);
             }
 
             return success;

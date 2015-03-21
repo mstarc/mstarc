@@ -82,6 +82,56 @@
             return (success = true);
         },
 
+        numberOfConnectedComponents : function() {
+            this.numberOfProcessorsRegistered();
+        },
+
+        /**
+         *
+         *
+         * @param {function} [filterFunc]   function(component) that returns true if the given component
+         *                                  needs to be in the returned hash object, false otherwise.
+         *
+         * @returns {object}                Returns hash with registered components :
+         *
+         * {
+         *
+         *  <component name1> : <component instance1>,
+         *
+         *  ...
+         *
+         *  <component nameN> : <component instanceN>
+         *
+         * }
+         *
+         */
+        getConnectedComponents : function(filterFunc) {
+            var me      = "{0}::MVCComponent::getComponents".fmt(this.getIName());
+            var comps   = {};
+
+            if (!_.func(filterFunc)) {
+                filterFunc = function(c) {
+                    return true;
+                }
+            }
+
+            var processors  = this.getRegisteredProcessors();
+            var processor   = null;
+            for (var processorName in processors) {
+                if (!processors.hasOwnProperty(processorName)) {
+                    continue;
+                }
+
+                processor = processors[processorName];
+
+                if (filterFunc(processor)) {
+                    comps[processorName] = processor;
+                }
+            }
+
+            return comps;
+        },
+
         allowedToRegister : function(component) {
             var me = "{0}::MVCComponent::allowedToRegister".fmt(this.getIName());
             _l.error(me, "No implementation provided, unable to assess if component is allowed to be registered");

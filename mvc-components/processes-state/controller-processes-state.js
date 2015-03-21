@@ -218,7 +218,7 @@
                     "wantToEdit",
                     {
                         what : property,
-                        value: newValue
+                        data : newValue
                     },
                     editProcessedCb);
         },
@@ -314,7 +314,7 @@
                              "the required interface for this mixin");
 
                 var api = ControllerProcessesState.REQUIRED_CONTROLLER_API;
-                _.info(me, "Required controller interface : ", _.stringify(api));
+                _l.info(me, "Required controller interface : ", _.stringify(api));
 
                 return this._stateProcessingInitialized;
             }
