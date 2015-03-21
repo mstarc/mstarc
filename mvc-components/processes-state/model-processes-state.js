@@ -26,6 +26,8 @@
         _state                      : null,
         _stateProcessingInitialized : false,
 
+        _properties                 : null,
+
         /**
          *
          * TODO : DRY up code.
@@ -42,18 +44,8 @@
          * - _updateToRemote(updateReadyCb), with updateReadyCb(err)
          * - _updateFromRemote(updateReadyCb), with updateReadyCb(err)
          *
-         *
-         * IMPORTANT : Almost all methods, including custom methods, have the following form:
-         *
-         *  actionInitiationSuccess = aMethod(property, value, callback);
-         *      or
-         *  actionInitiationSuccess = aMethod(value, callback);
-         *
-         * When actionInitiationSuccess is false the callback WILL NEVER be called.
-         * Only when true is the callback ALWAYS called.
-         *
-         * TODO : stop using success return value, do everything through the callback.
-         * This better fits with the event processing function conventions and simplifies a lot of things.
+         * IMPORTANT : The class that uses this mixin must define an array _properties, containing all
+         *             model property names.
          *
          *
          * *** TODO START : FUTURE : COMPLEX STATE ***
@@ -496,14 +488,32 @@
                 globalSyncing   : SyncState.UNKNOWN,
                 syncing         : {},
 
-                globalError     : this._calcGlobalErrorState(),
+                globalError     : null,
                 error           : {},
 
-                globalValidity  : this._calcGlobalValidityState(),
+                globalValidity  : null,
                 validity        : {}
             };
 
-            return (this._stateProcessingInitialized = true);
+            if (_.array(this._properties)) {
+                var property = null;
+                var result   = null;
+                var value    = null;
+                for (var idx in this._properties) {
+                    property    = this._properties[idx];
+                    value       = this._state.data[property];
+
+                    result      = this._callCustomMethod("_validate", property, value, null, false);
+                    this._state.validity[property] = result.result;
+                }
+            } else {
+                _l.warn(me, "No _properties array defined in Model");
+            }
+
+            this._stateProcessingInitialized    = true;
+            this._state.globalValidity          = this._calcGlobalValidityState();
+
+            return this._stateProcessingInitialized;
         },
 
         _updateFromRemote : function(updateReadyCb) {
@@ -564,6 +574,8 @@
                 _l.error(me, "stateType is not valid, unable to get state data for stateType");
                 return stateData;
             }
+
+            stateData = this._state[stateType];
 
             return stateData;
         },
@@ -1220,8 +1232,6 @@
                 });
                 return;
             }
-
-            updateProcessedCb = _.ensureFunc(updateProcessedCb);
 
             if (_.equals(this._state.validity[property], value)) {
                 _l.debug(me, ("Value for validity state of property {0} did not change, " +
