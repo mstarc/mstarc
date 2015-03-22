@@ -99,9 +99,7 @@
             }
 
             if ((!this.isRendered()) || forceRerender) {
-                this._didRender         = false;
-                this._reactUIInstance   = null;
-
+                this._didRender = false;
                 success = this._render();
             } else {
                 _l.warn(me, "View already rendered, not re-rendering view");
