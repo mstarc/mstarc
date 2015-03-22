@@ -35,7 +35,8 @@
          * standardized way.
          *
          *
-         * IMPORTANT : The class that uses this mixin must have a _renderState(stateRenderedCb) method implemented
+         * IMPORTANT : The class that uses this mixin must have a _scheduleRenderState(stateRenderedCb) method
+         *             implemented
          *
          *
          * IMPORTANT : Call _initStateProcessing() during construction of your class that uses this mixin
