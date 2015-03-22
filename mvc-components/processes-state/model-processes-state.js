@@ -24,6 +24,7 @@
         },
 
         _state                      : null,
+        _stateUpdated               : null,
         _stateProcessingInitialized : false,
 
         _properties                 : null,
@@ -454,11 +455,16 @@
             }
 
             var syncState = this._state.globalSyncing;
-            if (syncState < SyncState.SYNCED) {
-                _l.info(me, "There are local changes, update to server first.".fmt(SyncStateName[syncState]));
+            if ((syncState < SyncState.SYNCED) && (syncState != SyncState.UNKNOWN)) {
+                _l.info(me, ("There are local changes, update to server first. " +
+                             "(SyncState = {0})").fmt(SyncStateName[syncState]));
 
                 if (callbackGiven) { updateReadyCb(); }
                 return;
+            }
+
+            if (syncState == SyncState.UNKNOWN) {
+                _l.debug(me, "SyncState is UNKNOWN, continuing anyway ...");
             }
 
             this._updateFromRemote(updateReadyCb);
@@ -492,6 +498,20 @@
                 error           : {},
 
                 globalValidity  : null,
+                validity        : {}
+            };
+
+            this._stateUpdated = {
+                //The actual state property values
+                data            : {},
+
+                globalSyncing   : false,
+                syncing         : {},
+
+                globalError     : false,
+                error           : {},
+
+                globalValidity  : false,
                 validity        : {}
             };
 
@@ -639,13 +659,18 @@
                 return;
             }
 
-            if (this._isEqual(property, this._state.data[property], value)) {
+            if (
+                    this._isEqual(property, this._state.data[property], value) &&
+                    (this._stateUpdated.data[property] === true)
+               )
+            {
                 _l.debug(me, "Value for property {0} did not change, nothing to update".fmt(property));
                 __return();
                 return;
             }
 
-            this._state.data[property] = value;
+            this._state.data[property]          = value;
+            this._stateUpdated.data[property]   = true;
             updated = true;
 
             this._dispatchToControllers("dataStateUpdated", {
@@ -723,13 +748,14 @@
                 return;
             }
 
-            if (_.equals(this._state.globalSyncing, value)) {
+            if (_.equals(this._state.globalSyncing, value) && (this._stateUpdated.globalSyncing === true)) {
                 _l.debug(me, "Value for global sync state did not change, nothing to update");
                 __return();
                 return;
             }
 
             this._state.globalSyncing = value;
+            this._stateUpdated.globalSyncing = true;
             updated = true;
 
             this._dispatchToControllers("globalSyncStateUpdated", value, function(_err) {
@@ -914,13 +940,14 @@
                 return;
             }
 
-            if (_.equals(this._state.globalError, value)) {
+            if (_.equals(this._state.globalError, value) && (this._stateUpdated.globalError === true)) {
                 _l.debug(me, "Value for global error state did not change, nothing to update");
                 __return();
                 return;
             }
 
-            this._state.globalError = value;
+            this._state.globalError         = value;
+            this._stateUpdated.globalError  = true;
             updated = true;
 
             this._dispatchToControllers("globalErrorStateUpdated", value, function(_err) {
@@ -1008,13 +1035,14 @@
                 return;
             }
 
-            if (_.equals(this._state.error[property], value)) {
+            if (_.equals(this._state.error[property], value) && (this._stateUpdated.error[property] === true)) {
                 _l.debug(me, "Value for error state of property {0} did not change, nothing to update".fmt(property));
                 __return();
                 return;
             }
 
             this._state.error[property] = value;
+            this._stateUpdated.error[property] = true;
             updated = true;
 
             this._dispatchToControllers("errorStateUpdated", {
@@ -1139,13 +1167,14 @@
                 return;
             }
 
-            if (_.equals(this._state.globalValidity, value)) {
+            if (_.equals(this._state.globalValidity, value) && (this._stateUpdated.globalValidity === true)) {
                 _l.debug(me, "Value for global error state did not change, nothing to update");
                 __return();
                 return;
             }
 
             this._state.globalValidity = value;
+            this._stateUpdated.globalValidity = value;
             updated = true;
 
             this._dispatchToControllers("globalValidityStateUpdated", value, function(_err) {
@@ -1233,7 +1262,7 @@
                 return;
             }
 
-            if (_.equals(this._state.validity[property], value)) {
+            if (_.equals(this._state.validity[property], value) && (this._stateUpdated.validity[property] === true)) {
                 _l.debug(me, ("Value for validity state of property {0} did not change, " +
                               "nothing to update").fmt(property));
                 __return();
@@ -1241,6 +1270,7 @@
             }
 
             this._state.validity[property] = value;
+            this._stateUpdated.validity[property] = true;
             updated = true;
 
             this._dispatchToControllers("validityStateUpdated", {
