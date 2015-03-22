@@ -320,8 +320,8 @@
         },
 
         _getAPIPath : function(resourceID, relatedResourcePath) {
-            resourceID              = resourceID + "";
-            relatedResourcePath     = relatedResourcePath + "";
+            resourceID              = _.def(resourceID) ? resourceID + "" : "";
+            relatedResourcePath     = _.def(relatedResourcePath) ? relatedResourcePath + "" : "";
 
             var __valid = function(path) {
                 return !_.empty(path);
