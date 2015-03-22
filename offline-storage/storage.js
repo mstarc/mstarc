@@ -107,6 +107,7 @@
          *
          * @param {string} key      Key to store value at
          * @param {*} value         Anything but null or undefined
+         * @param {string} [propPath]     E.g. "user.address.street"
          *
          * @returns {*}
          *
@@ -129,7 +130,7 @@
             if (_.string(propPath)) {
                 o = this.get(key);
                 if (_.obj(o)) {
-                    if (!_.set(o, propPath, "Object for key {0}".fmt(key))) {
+                    if (!_.set(o, propPath, value, "Object for key {0}".fmt(key))) {
                         _l.error(me, "Unable to set value at path {0} for object at key [{1}]".fmt(propPath, key));
                         return success;
                     }
@@ -143,8 +144,8 @@
                 return this.set(key, o);
             }
 
-            if (!_.def(value)) {
-                _l.error(me, "Unable to set value to null or undefined, unable to set value of key {0}".fmt(key));
+            if (value === undefined) {
+                _l.error(me, "Unable to set value to undefined, unable to set value of key {0}".fmt(key));
                 return success;
             }
 
