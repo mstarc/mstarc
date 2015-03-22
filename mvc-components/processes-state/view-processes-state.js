@@ -26,6 +26,7 @@
             }
         },
 
+        _state                      : null,
         _stateProcessingInitialized : false,
 
         /**
@@ -54,8 +55,9 @@
          *
          *
          * Further, it adds functionality to allow editing and syncing of data state.
-         * When edit() is called a "wantToEdit" event is send to the connected controller.
-         * When updateToRemote() is called a "wantToUpdateToRemote" event is send to the connected controller.
+         * When _edit() is called a "wantToEdit" event is send to the connected controller.
+         * When _updateToRemote() is called a "wantToUpdateToRemote" event is send to the connected controller.
+         * When _updateFromRemote() is called a "wantToUpdateFromRemote" event is send to the connected controller.
          *
          * @class   ViewProcessesState
          * @module  M*C
@@ -63,67 +65,6 @@
          * @for     ReactView
          *
          */
-
-        edit : function(property, newValue, editProcessedCb) {
-            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
-            var me              = "{0}::ViewProcessesState::edit".fmt(iName);
-
-            var callbackGiven   = _.func(editProcessedCb);
-
-            var __returnError   = function(errStr) {
-                callbackGiven ? editProcessedCb({ message : errStr }) :  _l.error(me, errStr);
-            };
-
-            if (!this._stateProcessingInitialized) {
-                __returnError({
-                    message : "State processing is not initialized (correctly), call _initStateProcessing() in " +
-                              "your view-constructor first"
-                });
-                return;
-            }
-
-            if (this.isValid() === false) {
-                __returnError("View is invalid, unable to edit property {0}".fmt(property));
-                return;
-            }
-
-            this._dispatchToController(
-                    "wantToEdit",
-                    {
-                        what : property,
-                        data : newValue
-                    },
-                    editProcessedCb);
-        },
-
-        updateToRemote : function(syncProcessedCb) {
-            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
-            var me              = "{0}::ViewProcessesState::updateToRemote".fmt(iName);
-
-            var callbackGiven   = _.func(syncProcessedCb);
-
-            var __returnError   = function(errStr) {
-                callbackGiven ? syncProcessedCb({ message : errStr }) :  _l.error(me, errStr);
-            };
-
-            if (!this._stateProcessingInitialized) {
-                __returnError({
-                    message : "State processing is not initialized (correctly), call _initStateProcessing() in " +
-                              "your view-constructor first"
-                });
-                return;
-            }
-
-            if (this.isValid() === false) {
-                __returnError("View is invalid, unable to update to remote");
-                return;
-            }
-
-            this._dispatchToController(
-                    "wantToUpdateToRemote",
-                    null,
-                    syncProcessedCb);
-        },
 
         dataStateUpdated : function(controller, data, eventProcessedCb) {
             var self = this;
@@ -215,7 +156,7 @@
                 return this._stateProcessingInitialized;
             }
             
-            this._state = {
+            this._state     = {
                 //The actual state property values
                 data            : {},
 
@@ -230,6 +171,68 @@
             };
 
             return (this._stateProcessingInitialized = true);
+        },
+
+
+        _edit : function(property, newValue, editProcessedCb) {
+            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
+            var me              = "{0}::ViewProcessesState::_edit".fmt(iName);
+
+            var callbackGiven   = _.func(editProcessedCb);
+
+            var __returnError   = function(errStr) {
+                callbackGiven ? editProcessedCb({ message : errStr }) :  _l.error(me, errStr);
+            };
+
+            if (!this._stateProcessingInitialized) {
+                __returnError({
+                    message : "State processing is not initialized (correctly), call _initStateProcessing() in " +
+                    "your view-constructor first"
+                });
+                return;
+            }
+
+            if (this.isValid() === false) {
+                __returnError("View is invalid, unable to edit property {0}".fmt(property));
+                return;
+            }
+
+            this._dispatchToController(
+                    "wantToEdit",
+                    {
+                        what : property,
+                        data : newValue
+                    },
+                    editProcessedCb);
+        },
+
+        _updateToRemote : function(syncProcessedCb) {
+            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
+            var me              = "{0}::ViewProcessesState::_updateToRemote".fmt(iName);
+
+            var callbackGiven   = _.func(syncProcessedCb);
+
+            var __returnError   = function(errStr) {
+                callbackGiven ? syncProcessedCb({ message : errStr }) :  _l.error(me, errStr);
+            };
+
+            if (!this._stateProcessingInitialized) {
+                __returnError({
+                    message : "State processing is not initialized (correctly), call _initStateProcessing() in " +
+                    "your view-constructor first"
+                });
+                return;
+            }
+
+            if (this.isValid() === false) {
+                __returnError("View is invalid, unable to update to remote");
+                return;
+            }
+
+            this._dispatchToController(
+                    "wantToUpdateToRemote",
+                    null,
+                    syncProcessedCb);
         },
 
         _processControllerEvent : function(eventName, isGlobal, stateUpdateFunc, processingArguments) {
