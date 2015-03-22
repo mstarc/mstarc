@@ -147,10 +147,10 @@
                 }
 
                 if (cancelled === true) {
-                    _l.info(me, ("Cancelled processing of event [{0}] by processor [{0}], " +
+                    _l.info(me, ("Cancelled processing of event [{0}] by processor [{1}], " +
                                  "doing nothing").fmt(eventName, controllerName));
                 } else if (_.def(_err)) {
-                    var action = "Processing of event [{0}] by processor [{0}]".fmt(eventName, controllerName);
+                    var action = "Processing of event [{0}] by processor [{1}]".fmt(eventName, controllerName);
                     err.error_hash[action] = _err;
                 }
 
