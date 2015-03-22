@@ -286,7 +286,7 @@
                 stateUpdateFunc(property, value);
             }
 
-            this._renderState(eventProcessedCb);
+            this._scheduleRenderState(eventProcessedCb);
         }
 
     });
