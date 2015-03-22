@@ -33,6 +33,16 @@
 
         _state              : {},
 
+        /**
+         *
+         * {
+         *      scheduled : {true | false},
+         *      callbacks : {array of callbacks to call when the state is set}
+         * }
+         *
+         */
+        _setStateScheduling : null,
+
         _reactUIClass       : null,
         _reactUIElement     : null,
         _reactUIInstance    : null,
@@ -44,22 +54,48 @@
          * Hooks up a React UI to a MVC combination. A react UI is a high-level React element that combines multiple
          * elements in to an UI.
          *
-         * The ReactView renders the React UI, by first creating the _reactUIElement based on the _reactUIClass given
-         * during construction. createReactUIElement() provides the implementation for creating the _reactUIElement.
-         * By creating the _reactUIElement you provide view methods that need to be called on user input., e.g.:
          *
-         * createReactUIElement : function(reactUIClass) {
+         * IMPORTANT : Each ReactJS UI must implement the method componentDidMount, as follows:
+         *
+         * componentDidMount : function() {
+         *
+         *   ...
+         *
+         *   this.props.onComponentDidMount();
+         *
+         *   ...
+         *
+         * }
+         *
+         * This will call the _onComponentDidMount() of the ReactView, which controls when state updates can be
+         * provided to the React UI, through .setState().
+         *
+         *
+         * ** HOW THE REACT UI INSTANCE IS CREATED **
+         * The ReactView renders the React UI, by first creating the _reactUIElement based on the _reactUIClass given
+         * during construction of the view. _createReactUIElement() provides the implementation for creating the
+         * _reactUIElement. This method calls the _extendReactUIProps(props) method that allows you to extend the
+         * react UI properties object that is passed during construction of the react UI instance.
+         *
+         * For instance, you can extend this property object, props, with view methods that can process input
+         * received by the react UI. So the _extendReactUIProps methods could look something like this:
+         *
+         * _extendReactUIProps : function(props) {
          *      var view = this; //The view instance
          *
-         *      return ReactView.createReactElement(reactUIClass, {
-         *          onSubmit : view.handleSubmit.bind(view),
+         *      //Handling a onSubmit event from the ReactUI
+         *      props.onSubmit = view.handleSubmit.bind(view);
          *
          *          ...
          *
-         *          someProp : view.someProp
-         *      });
+         *      //Some property used in the ReactUI
+         *      props.someProp = view.someProp;
+         *
+         *      return props;
          * }
          *
+         *
+         * ** HOW THE REACT UI IS RENDERED **
          * During _render() React.render() is called which returns a reference to the rendered React component:
          * _reactUIInstance. This instance is used to call setState(), allowing the view to pass state updates to
          * the React UI. In the callback if React.render() _onViewRendered() is called which subsequently calls
@@ -90,8 +126,9 @@
          *
          *                                      This method is called during construction.
          *
-         *  - createReactUIElement              Implements the creation of the React UI element, hooking up
-         *                                      view methods that need to handle user input
+         *  - _extendReactUIProps               Extends the property object that is used during construction of
+         *                                      the React UI. Through the properties object you can hook up
+         *                                      view methods that need to handle user input.
          *
          * Methods you can OPTIONALLY override in subclasses :
          *
@@ -117,6 +154,11 @@
 
             this._reactUIClass = reactUIClass;
             this._DOMContainer = DOMContainer;
+
+            this._setStateScheduling = {
+                  scheduled : false,
+                  callbacks : []
+            };
 
             NS.ReactView.$super.call(this, viewName, config);
         },
@@ -192,8 +234,8 @@
             return (success = true);
         },
 
-        _renderState : function(stateRenderedCb) {
-            var me = "{0}::ReactView::_renderState".fmt(this.getIName());
+        _scheduleRenderState : function(stateRenderedCb) {
+            var me = "{0}::ReactView::_scheduleRenderState".fmt(this.getIName());
 
             var callbackGiven   = _.func(stateRenderedCb);
 
@@ -201,25 +243,95 @@
                 callbackGiven ? stateRenderedCb({ message : errStr }) :  _l.error(me, errStr);
             };
 
-            var ui = this._getReactUIInstance();
-            if (_.hasMethod(ui, "setState", "React UI Instance")) {
-                ui.setState(this._state);
+            if (this._setStateScheduling.scheduled) {
+                if (callbackGiven) { this._setStateScheduling.callbacks.push(stateRenderedCb) }
+                _l.debug(me, "Setting state delayed, waiting for React UI to mount ...");
+                return;
+            }
 
-                //TODO : actually callback when state is rendered by React
-                if (callbackGiven) { stateRenderedCb(); }
+            var ui = this._getReactUIInstance();
+            if (_.hasMethod(ui, "isMounted", "React UI Instance")) {
+                if (ui.isMounted()) {
+                    if (callbackGiven) { this._setStateScheduling.callbacks.push(stateRenderedCb); }
+                    this._renderState();
+                } else {
+                    _l.debug(me, "React UI not mounted, set state delayed, waiting for React UI to mount ...");
+                    this._setStateScheduling.scheduled = true;
+                    if (callbackGiven) { this._setStateScheduling.callbacks.push(stateRenderedCb); }
+                }
             } else {
                 __returnError("No valid React UI instance available, unable to render state");
             }
         },
 
+        _renderState : function() {
+            var me = "{0}::ReactView::_renderState".fmt(this.getIName());
+            var self = this;
+
+            var callbackGiven   = !_.empty(this._setStateScheduling.callbacks);
+
+            var __return   = function(errStr) {
+                if (callbackGiven) {
+                    var cbs = self._setStateScheduling.callbacks;
+                    var cb  = null;
+                    while (!_.empty(cbs)) {
+                        cb = cbs.shift();
+                        cb(_.def(errStr) ? { message : errStr } : null);
+                    }
+                } else {
+                    _.def(errStr) ? _l.error(me, errStr) : null;
+                }
+            };
+
+            var ui = this._getReactUIInstance();
+            if (_.hasMethod(ui, "setState", "React UI Instance")) {
+                ui.setState(this._state);
+                __return();
+            } else {
+                __return("No valid React UI instance available, unable to render state");
+            }
+        },
+
+        _onComponentDidMount : function() {
+            var me = "{0}::ReactView::_onComponentDidMount".fmt(this.getIName());
+
+            _l.debug(me, "React UI mounted.");
+            if (this._setStateScheduling.scheduled) {
+                _l.debug(me, "Set state was scheduled, executing now ...");
+                this._setStateScheduling.scheduled = false;
+                this._renderState();
+            }
+        },
+
+        _extendReactUIProps : function(props) {
+            var me = "{0}::ReactView::_extendReactUIProps".fmt(this.getIName());
+
+            _l.info(me, "No implementation, there are no properties to instantiate the React UI with?");
+            _l.info(me, "Implement this method in your subclass in order to add React UI properties");
+            _l.info(me, "This is the place to add hooks to receive input back from the UI.");
+
+            return props;
+        },
+
         _createReactUIElement : function(reactUIClass) {
-            var me = "{0}::ReactView::_createReactUIElement".fmt(this.getIName());
+            var me      = "{0}::ReactView::_createReactUIElement".fmt(this.getIName());
+            var self    = this;
 
-            _l.error(me, "No implementation, create React UI element based on provided class");
-            _l.info(me, "Implement this method in your subclass in order to create the " +
-                        "React UI element, hooking up view methods that process user input");
+            var __createProps = function() {
+                return {
+                    onComponentDidMount : self._onComponentDidMount.bind(self)
+                };
+            };
+            var props = this._extendReactUIProps(__createProps());
+            if (!_.obj(props)) {
+                _l.error(me, "Your _extendReactUIProps method did not return the " +
+                             "(extended) property object provided, please return it!");
+                _l.info(me, "For now the originally provided property object will be used." +
+                            "Your React UI will likely not work properly, though ...");
+                props = __createProps();
+            }
 
-            return null;
+            return ReactView.createReactElement(reactUIClass, props);
         },
 
         _getReactUIInstance : function() {
