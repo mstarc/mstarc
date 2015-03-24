@@ -1081,9 +1081,7 @@
 
         /**
          *
-         * Provides a list of properties that have errors.
-         *
-         * @returns {number} Provides a list of properties that have errors. Null means unknown.
+         * @returns {object} Error object summarizing the current errors
          *
          * @protected
          */
@@ -1099,13 +1097,15 @@
                 return globalErrorState;
             }
 
-            globalErrorState    = [];
             var error           = this._state.error;
             if (_.empty(error)) {
                 return globalErrorState;
             }
 
-            var errState = null;
+            var errHash     = {};
+            var errState    = null;
+            var errDesc     = null;
+            var numErrors   = 0;
             for (var property in error) {
                 if (!error.hasOwnProperty(property)) {
                     continue;
@@ -1113,8 +1113,19 @@
 
                 errState = error[property];
                 if (_.def(errState) && (errState !== false)) {
-                    globalErrorState.push(property);
+                    numErrors++;
+                    errDesc = _.capitaliseFirst(property) + " error";
+                    errHash[errDesc] = errState;
                 }
+            }
+
+            if (!_.empty(errHash)) {
+                globalErrorState = {
+                    message : (numErrors > 1) ? "An error occurred" : "Multiple errors occurred",
+                    originalError : {
+                        error_hash : errHash
+                    }
+                };
             }
 
             return globalErrorState;
