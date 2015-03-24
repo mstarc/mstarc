@@ -117,7 +117,7 @@
             }
 
             if (callError) {
-                var me = "{0}::SimpleResourceManager::_get".fmt(this.getIName());
+                var me = "{0}::SpeaksREST::_get".fmt(this.getIName());
                 _l.error(me, "Calling convention not recognized, unable to fulfill the request");
                 return false;
             }
@@ -169,7 +169,7 @@
             }
 
             if (callError) {
-                var me = "{0}::SimpleResourceManager::_post".fmt(this.getIName());
+                var me = "{0}::SpeaksREST::_post".fmt(this.getIName());
                 _l.error(me, "Calling convention not recognized, unable to fulfill the request");
                 return false;
             }
@@ -223,7 +223,7 @@
             }
 
             if (callError) {
-                var me = "{0}::SimpleResourceManager::_put".fmt(this.getIName());
+                var me = "{0}::SpeaksREST::_put".fmt(this.getIName());
                 _l.error(me, "Calling convention not recognized, unable to fulfill the request");
                 return false;
             }
@@ -297,7 +297,7 @@
             }
 
             if (callError) {
-                var me = "{0}::SimpleResourceManager::_get".fmt(this.getIName());
+                var me = "{0}::SpeaksREST::_del".fmt(this.getIName());
                 _l.error(me, "Calling convention not recognized, unable to fulfill the request");
                 return false;
             }
@@ -306,7 +306,7 @@
         },
 
         _request : function(action, resourceID, propPath, data, resultCb) {
-            var me      = "{0}::SimpleResourceManager::_request".fmt(this.getIName());
+            var me      = "{0}::SpeaksREST::_request".fmt(this.getIName());
             var success = false;
 
             var path    = this._getAPIPath(resourceID, propPath);
