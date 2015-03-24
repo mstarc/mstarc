@@ -60,9 +60,9 @@
             }
 
             if (show) {
-                $(this._DOMContainer).addClass("visible");
+                $(this._DOMContainer).addClass("show");
             } else {
-                $(this._DOMContainer).removeClass("visible");
+                $(this._DOMContainer).removeClass("show");
             }
 
             //TODO : really wait for transition to complete?
