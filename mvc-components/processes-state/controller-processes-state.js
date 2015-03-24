@@ -131,8 +131,8 @@
 
         errorStateUpdated : function(model, data, eventProcessedCb) {
             this._processModelEvent(
-                    "_processGlobalErrorState",
-                    "globalErrorStateUpdated",
+                    "_processErrorState",
+                    "errorStateUpdated",
                     false,
                     arguments);
         },
