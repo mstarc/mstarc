@@ -175,24 +175,24 @@
             var me      = "Application:getService";
             var service = null;
 
-            if (!_.obj(this.services)) {
+            if (!_.obj(this._services)) {
                 _l.error(me, "No services provided, unable to get [{0}]".fmt(name));
                 return service;
             }
 
-            return (service = this.services[name]);
+            return (service = this._services[name]);
         },
 
         getManager : function(name) {
             var me      = "Application:getManager";
             var manager = null;
 
-            if (!_.obj(this.managers)) {
+            if (!_.obj(this._managers)) {
                 _l.error(me, "No managers provided, unable to get [{0}]".fmt(name));
                 return manager;
             }
 
-            return (manager = this.managers[name]);
+            return (manager = this._managers[name]);
         },
 
         /*********************************************************************
