@@ -47,8 +47,9 @@
          * @param {String} componentName            name of model
          *
          * @param {Object} [config]                 Object containing additional properties the model needs to
-         *                                          know about. The properties in the config are added to the Model
-         *                                          instance if they not already exist. Also see Configurable mixin.
+         *                                          know about. The properties in the config are added to the
+         *                                          MVCComponent instance if they not already exist.
+         *                                          Also see Configurable mixin.
          *
          */
         constructor: function (componentName, config) {
