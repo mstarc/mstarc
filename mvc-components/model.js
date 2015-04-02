@@ -105,7 +105,23 @@
             return success;
         },
 
-        _dispatchToControllers : function(eventName, eventData, eventProcessedCb, throttle, throttleDelay) {
+        /**
+         *
+         * @param eventName
+         * @param eventData
+         * @param eventProcessedCb
+         *
+         * @param {object} config
+         * @param {object} [config.excludedComponent=null]
+         * @param {boolean} [config.throttle=false]
+         * @param {number} [config.throttleDelay]
+         *
+         * @returns {boolean}
+         *
+         * @protected
+         */
+
+        _dispatchToControllers : function(eventName, eventData, eventProcessedCb, config) {
             var me              = "{0}::Model::_dispatchToControllers".fmt(this.getIName());
             var success         = false;
 
@@ -114,6 +130,11 @@
             };
 
             eventProcessedCb    = _.ensureFunc(eventProcessedCb);
+
+            config = config || {};
+            var excludedComponent   = config.excludedComponent;
+            var throttle            = config.throttle;
+            var throttleDelay       = config.throttleDelay;
 
             if (!_.bool(throttle)) {
                 throttle = false;
@@ -165,11 +186,11 @@
             if (!throttle) {
                 success = this._dispatch(eventName, eventData, function(controller, err) {
                     __handleCallback(controller, false, err);
-                });
+                }, excludedComponent);
             } else {
                 success = this._dispatchThrottled(eventName, eventData, function(controller, cancelled, err) {
                     __handleCallback(controller, cancelled, err);
-                }, throttleDelay);
+                }, throttleDelay, excludedComponent);
             }
 
             return success;

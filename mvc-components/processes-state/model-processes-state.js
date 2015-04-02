@@ -342,7 +342,7 @@
                 }
 
                 if (!updated) {
-                    _l.debug(me, "Property [{0}] was not updated, stopping");
+                    _l.debug(me, "Property [{0}] was not updated, stopping".fmt(property));
                     return;
                 }
 
@@ -619,11 +619,14 @@
          * @param {function} [updateProcessedCb]    Callback(updated, err) called when update has been processed
          *                                          When updated is false and err is not an object, no update was
          *                                          performed because the value didn't change.
+         * @param {object} [excludedComponent]      When an excludedComponent is given, the update event is not send
+         *                                          to this component
+         *
          *
          * @protected
          *
          */
-        _updateDataState : function(property, value, updateProcessedCb) {
+        _updateDataState : function(property, value, updateProcessedCb, excludedComponent) {
             var iName   = _.exec(this, 'getIName') || "[UNKOWN]";
             var me      = "{0}::ModelProcessesState::_updateDataState".fmt(iName);
             var self    = this;
@@ -698,6 +701,9 @@
 
                     __return(err);
                 }
+            },
+            {
+                excludedComponent: excludedComponent
             });
         },
 

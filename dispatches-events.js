@@ -251,12 +251,14 @@
          *                                          <err> is an error object when processing the event resulted in
          *                                          an error
          *
+         * @param {object} [excludedProcessor]      Optionally you can exclude a processor from receiving the event
+         *
          * @returns {boolean}                       True when dispatch was initiated successfully else false
          *
          * @protected
          *
          */
-        _dispatch : function(eventName, eventData, cbEventProcessed) {
+        _dispatch : function(eventName, eventData, cbEventProcessed, excludedProcessor) {
             //var me      = "[{0}]::DispatchesEvents::_dispatch".fmt(_.exec(this, 'getIName') || '[UNKOWN]');
             var self    = this;
             var success = true;
@@ -274,6 +276,11 @@
             var processor = null;
             for (var processorName in this._processors) {
                 processor = this._processors[processorName];
+                if (processor === excludedProcessor) {
+                    cbEventProcessed(processor);
+                    continue;
+                }
+
                 if (_.obj(processor)) { success = __doDispatch(processor) && success; }
             }
 
@@ -312,12 +319,14 @@
          *                                          <err> is an error object when processing the event resulted in
          *                                          an error
          *
+         * @param {object} [excludedProcessor]      Optionally you can exclude a processor from receiving the event
+         *
          * @param {number} [throttleDelay]          Delay in milliseconds, see _scheduleEventDispatch for default value
          *
          * @protected
          *
          */
-        _dispatchThrottled : function(eventName, eventData, cbEventProcessed, throttleDelay) {
+        _dispatchThrottled : function(eventName, eventData, cbEventProcessed, throttleDelay, excludedProcessor) {
             //var me      = "[{0}]::DispatchesEvents::_dispatchThrottled".fmt(_.exec(this, 'getIName') || '[UNKOWN]');
             var success   = true;
 
@@ -328,6 +337,11 @@
             var processor = null;
             for (var processorName in this._processors) {
                 processor = this._processors[processorName];
+                if (processor === excludedProcessor) {
+                    cbEventProcessed(processor);
+                    continue;
+                }
+
                 if (_.obj(processor)) {
                     success = this._scheduleEventDispatch(
                             processor,
