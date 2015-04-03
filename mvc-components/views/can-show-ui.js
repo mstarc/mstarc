@@ -30,12 +30,6 @@
          *
          */
 
-        wantToShowUI : function(origin, show, showReadyCb) {
-
-            this.showUI(show, showReadyCb);
-
-        },
-
         /**
          *
          * @param {boolean} [show = true]      Set to false to hide the UI
@@ -67,6 +61,18 @@
 
             //TODO : really wait for transition to complete?
             _.ensureFunc(showReadyCb)();
+        },
+
+        /*********************************************************************
+         *
+         * PROTECTED METHODS
+         *
+         *********************************************************************/
+
+        _wantToShowUI : function(origin, show, showReadyCb) {
+
+            this.showUI(show, showReadyCb);
+
         }
 
     });

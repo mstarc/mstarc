@@ -78,9 +78,14 @@
          * The class using this mixin can implement the following custom methods that are called when the view
          * events are received:
          *
+         * [before processing]
          * - _onWantToEdit(property, value)
          * - _onWantToUpdateToRemote()
          * - _onWantToUpdateFromRemote()
+         *
+         * [after processing]
+         * - _onUpdatedToRemote()
+         * - _onUpdatedFromRemote()
          *
          * These methods are called before the view events are forwarded to the connected model.
          *
@@ -98,13 +103,70 @@
          *
          */
 
+        /**
+         *
+         * Edit data <property> by setting it to a new <value>
+         *
+         * @param property          property for which to edit a value
+         * @param value             New value for property
+         * @param editProcessedCb   function(err), callback called when the edit has been processed throughout
+         *                          the whole MVC
+         *
+         */
+        edit : function(property, value, editProcessedCb) {
+            this._wantToEdit(
+                    this,
+                    {
+                        what : property,
+                        data : value
+                    },
+                    editProcessedCb);
+        },
+
+        updateFromRemote : function(updateReadyCb) {
+            this._wantToUpdateFromRemote(
+                    this,
+                    null,
+                    updateReadyCb);
+        },
+
+        updateToRemote : function(updateToRemoteCb) {
+            this._wantToUpdateToRemote(
+                    this,
+                    null,
+                    updateToRemoteCb);
+        },
+
+        /*********************************************************************
+         *
+         * PROTECTED METHODS
+         *
+         *********************************************************************/
+
+        _initStateProcessing : function() {
+            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
+            var me              = "{0}::ControllerProcessesState::_initStateProcessing";
+
+            if (!_.interfaceAdheres(this, ControllerProcessesState.REQUIRED_CONTROLLER_API)) {
+                _l.error(me, "Init state processing failed : this controller does not adhere to " +
+                             "the required interface for this mixin");
+
+                var api = ControllerProcessesState.REQUIRED_CONTROLLER_API;
+                _l.info(me, "Required controller interface : ", _.stringify(api));
+
+                return this._stateProcessingInitialized;
+            }
+
+            return (this._stateProcessingInitialized = true);
+        },
+
         /********************************************************************
          *
          * MODEL EVENT HANDLERS
          *
          ********************************************************************/
 
-        dataStateUpdated : function(model, data, eventProcessedCb) {
+        _dataStateUpdated : function(model, data, eventProcessedCb) {
             this._processModelEvent(
                     "_processDataState",
                     "dataStateUpdated",
@@ -112,7 +174,7 @@
                     arguments);
         },
 
-        globalSyncStateUpdated : function(model, data, eventProcessedCb) {
+        _globalSyncStateUpdated : function(model, data, eventProcessedCb) {
             this._processModelEvent(
                     "_processGlobalSyncState",
                     "globalSyncStateUpdated",
@@ -120,7 +182,7 @@
                     arguments);
         },
 
-        globalErrorStateUpdated : function(model, data, eventProcessedCb) {
+        _globalErrorStateUpdated : function(model, data, eventProcessedCb) {
             this._processModelEvent(
                     "_processGlobalErrorState",
                     "globalErrorStateUpdated",
@@ -129,7 +191,7 @@
         },
 
 
-        errorStateUpdated : function(model, data, eventProcessedCb) {
+        _errorStateUpdated : function(model, data, eventProcessedCb) {
             this._processModelEvent(
                     "_processErrorState",
                     "errorStateUpdated",
@@ -137,7 +199,7 @@
                     arguments);
         },
 
-        globalValidityStateUpdated : function(model, data, eventProcessedCb) {
+        _globalValidityStateUpdated : function(model, data, eventProcessedCb) {
             this._processModelEvent(
                     "_processGlobalValidityState",
                     "globalValidityStateUpdated",
@@ -145,7 +207,7 @@
                     arguments);
         },
 
-        validityStateUpdated : function(model, data, eventProcessedCb) {
+        _validityStateUpdated : function(model, data, eventProcessedCb) {
             this._processModelEvent(
                     "_processValidityState",
                     "validityStateUpdated",
@@ -159,29 +221,9 @@
          *
          ********************************************************************/
 
-        /**
-         *
-         * Edit data <property> by setting it to a new <value>
-         *
-         * @param property          property for which to edit a value
-         * @param value             New value for property
-         * @param editProcessedCb   function(err), callback called when the edit has been processed throughout
-         *                          the whole MVC
-         *
-         */
-        edit : function(property, value, editProcessedCb) {
-            this.wantToEdit(
-                    this,
-                    {
-                        what : property,
-                        data : value
-                    },
-                    editProcessedCb);
-        },
-
-        wantToEdit : function(origin, data, editProcessedCb) {
+        _wantToEdit : function(origin, data, editProcessedCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
-            var me              = "{0}::ControllerProcessesState::wantToEdit".fmt(iName);
+            var me              = "{0}::ControllerProcessesState::_wantToEdit".fmt(iName);
 
             var callbackGiven   = _.func(editProcessedCb);
 
@@ -223,16 +265,9 @@
                     editProcessedCb);
         },
 
-        updateToRemote : function(updateToRemoteCb) {
-            this.wantToUpdateToRemote(
-                    this,
-                    null,
-                    updateToRemoteCb);
-        },
-
-        wantToUpdateToRemote : function(origin, data, updateReadyCb) {
+        _wantToUpdateToRemote : function(origin, data, updateReadyCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
-            var me              = "{0}::ControllerProcessesState::wantToUpdateToRemote".fmt(iName);
+            var me              = "{0}::ControllerProcessesState::_wantToUpdateToRemote".fmt(iName);
 
             var callbackGiven   = _.func(updateReadyCb);
 
@@ -258,19 +293,20 @@
             this._dispatchToModel(
                     "wantToUpdateToRemote",
                     data,
-                    updateReadyCb);
+                    function(err) {
+                        self._onUpdatedToRemote(err, updateReadyCb);
+                    });
         },
 
-        updateFromRemote : function(updateReadyCb) {
-            this.wantToUpdateFromRemote(
-                    this,
-                    null,
-                    updateReadyCb);
+        _onUpdatedToRemote : function(err, updateReadyCb) {
+            var callbackGiven   = _.func(updateReadyCb);
+            callbackGiven ? updateReadyCb(err) :  _l.error(me, "Error occurred : ", _.stringify(err));
         },
 
-        wantToUpdateFromRemote : function(origin, data, updateReadyCb) {
+        _wantToUpdateFromRemote : function(origin, data, updateReadyCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
-            var me              = "{0}::ControllerProcessesState::wantToUpdateFromRemote".fmt(iName);
+            var me              = "{0}::ControllerProcessesState::_wantToUpdateFromRemote".fmt(iName);
+            var self            = this;
 
             var callbackGiven   = _.func(updateReadyCb);
 
@@ -280,7 +316,7 @@
 
             if (!this._stateProcessingInitialized) {
                 __returnError("State processing is not initialized (correctly), call _initStateProcessing() in " +
-                "your controller-constructor first");
+                              "your controller-constructor first");
                 return;
             }
 
@@ -296,30 +332,14 @@
             this._dispatchToModel(
                     "wantToUpdateFromRemote",
                     data,
-                    updateReadyCb);
+                    function(err) {
+                        self._onUpdatedFromRemote(err, updateReadyCb);
+                    });
         },
 
-        /*********************************************************************
-         *
-         * PROTECTED METHODS
-         *
-         *********************************************************************/
-
-        _initStateProcessing : function() {
-            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
-            var me              = "{0}::ControllerProcessesState::_initStateProcessing";
-
-            if (!_.interfaceAdheres(this, ControllerProcessesState.REQUIRED_CONTROLLER_API)) {
-                _l.error(me, "Init state processing failed : this controller does not adhere to " +
-                             "the required interface for this mixin");
-
-                var api = ControllerProcessesState.REQUIRED_CONTROLLER_API;
-                _l.info(me, "Required controller interface : ", _.stringify(api));
-
-                return this._stateProcessingInitialized;
-            }
-
-            return (this._stateProcessingInitialized = true);
+        _onUpdatedFromRemote : function(err, updateReadyCb) {
+            var callbackGiven   = _.func(updateReadyCb);
+            callbackGiven ? updateReadyCb(err) :  _l.error(me, "Error occurred : ", _.stringify(err));
         },
 
         _processModelEvent : function(customProcessMethodName, eventName, isGlobal, processingArguments) {

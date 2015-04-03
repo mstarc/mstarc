@@ -67,79 +67,6 @@
          *
          */
 
-        dataStateUpdated : function(controller, data, eventProcessedCb) {
-            var self = this;
-
-            this._processControllerEvent(
-                    "dataStateUpdated",
-                    false,
-                    function(property, value) {
-                        self._state.data[property]  = value;
-                    },
-                    arguments);
-        },
-
-        globalSyncStateUpdated : function(controller, data, eventProcessedCb) {
-            var self = this;
-
-            this._processControllerEvent(
-                    "globalSyncStateUpdated",
-                    true,
-                    function(value) {
-                        self._state.globalSyncing = value;
-                    },
-                    arguments);
-        },
-
-        globalErrorStateUpdated : function(controller, data, eventProcessedCb) {
-            var self = this;
-
-            this._processControllerEvent(
-                    "globalErrorStateUpdated",
-                    true,
-                    function(value) {
-                        self._state.globalError = value;
-                    },
-                    arguments);
-        },
-
-
-        errorStateUpdated : function(controller, data, eventProcessedCb) {
-            var self = this;
-
-            this._processControllerEvent(
-                    "errorStateUpdated",
-                    false,
-                    function(property, value) {
-                        self._state.error[property] = value;
-                    },
-                    arguments);
-        },
-
-        globalValidityStateUpdated : function(controller, data, eventProcessedCb) {
-            var self = this;
-
-            this._processControllerEvent(
-                    "globalValidityStateUpdated",
-                    true,
-                    function(value) {
-                        self._state.globalValidity = value;
-                    },
-                    arguments);
-        },
-
-        validityStateUpdated : function(controller, data, eventProcessedCb) {
-            var self = this;
-
-            this._processControllerEvent(
-                    "validityStateUpdated",
-                    false,
-                    function(property, value) {
-                        self._state.validity[property] = value;
-                    },
-                    arguments);
-        },
-
         /*********************************************************************
          *
          * PROTECTED METHODS
@@ -205,6 +132,79 @@
                         data : newValue
                     },
                     editProcessedCb);
+        },
+
+        _dataStateUpdated : function(controller, data, eventProcessedCb) {
+            var self = this;
+
+            this._processControllerEvent(
+                    "dataStateUpdated",
+                    false,
+                    function(property, value) {
+                        self._state.data[property]  = value;
+                    },
+                    arguments);
+        },
+
+        _globalSyncStateUpdated : function(controller, data, eventProcessedCb) {
+            var self = this;
+
+            this._processControllerEvent(
+                    "globalSyncStateUpdated",
+                    true,
+                    function(value) {
+                        self._state.globalSyncing = value;
+                    },
+                    arguments);
+        },
+
+        _globalErrorStateUpdated : function(controller, data, eventProcessedCb) {
+            var self = this;
+
+            this._processControllerEvent(
+                    "globalErrorStateUpdated",
+                    true,
+                    function(value) {
+                        self._state.globalError = value;
+                    },
+                    arguments);
+        },
+
+
+        _errorStateUpdated : function(controller, data, eventProcessedCb) {
+            var self = this;
+
+            this._processControllerEvent(
+                    "errorStateUpdated",
+                    false,
+                    function(property, value) {
+                        self._state.error[property] = value;
+                    },
+                    arguments);
+        },
+
+        _globalValidityStateUpdated : function(controller, data, eventProcessedCb) {
+            var self = this;
+
+            this._processControllerEvent(
+                    "globalValidityStateUpdated",
+                    true,
+                    function(value) {
+                        self._state.globalValidity = value;
+                    },
+                    arguments);
+        },
+
+        _validityStateUpdated : function(controller, data, eventProcessedCb) {
+            var self = this;
+
+            this._processControllerEvent(
+                    "validityStateUpdated",
+                    false,
+                    function(property, value) {
+                        self._state.validity[property] = value;
+                    },
+                    arguments);
         },
 
         _updateToRemote : function(syncProcessedCb) {

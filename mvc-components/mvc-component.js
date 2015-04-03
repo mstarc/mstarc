@@ -32,6 +32,13 @@
          * When the component is ready to process events you need to call this._readyToProcessEvents() in your subclass
          *
          *
+         * When a MVCComponent receives an event it tries to process the event by calling a method called:
+         *
+         *      _<eventName>(origin, eventData, eventProcessedCb)
+         *
+         * Notice the underscore at the start of the method name.
+         *
+         *
          * Methods to override:
          * _componentIsReady
          *
@@ -144,13 +151,15 @@
             var me      = "{0}::MVCComponent::processEvent".fmt(this.getIName());
             var success = false;
 
-            if (!_.hasMethod(this, eventName)) {
+            var eventMethodName = "_" + eventName;
+
+            if (!_.hasMethod(this, eventMethodName)) {
                 _l.debug(me, "No method available to process event {0}, not processing".fmt(eventName));
                 return success;
             }
 
             if (this._componentIsReady()) {
-                this[eventName].call(this, origin, eventData, eventProcessedCb);
+                this[eventMethodName].call(this, origin, eventData, eventProcessedCb);
             } else {
                 this._eventQueue.push({
                     origin      : origin,
@@ -218,8 +227,10 @@
 
                 //schedule in new run loop
                 setTimeout(function() {
-                    if (_.hasMethod(self, event.name)) {
-                        self[event.name].call(self, event.origin, event.data, event.callback);
+                    var eventMethodName = "_" + event.name;
+
+                    if (_.hasMethod(self, eventMethodName)) {
+                        self[eventMethodName].call(self, event.origin, event.data, event.callback);
                     } else {
                         var iName = self.getIName();
 

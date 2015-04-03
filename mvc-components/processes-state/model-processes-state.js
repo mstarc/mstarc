@@ -81,7 +81,7 @@
          * different from the old value. To assess if two property values are equal it will use a custom method if
          * available, using the following naming convention:
          *
-         *  isEqual<Property>(val1, val2)
+         *  _isEqual<Property>(val1, val2)
          *
          * When the updateToRemote() method is called it is checked if globalSyncing is NOT_SYNCED.
          * If so, the _updateToRemote(updateToRemoteReadyCb) method is called. This method needs to be overridden by
@@ -296,26 +296,32 @@
             return _.get(this._getState("validity"), property);
         },
 
-        wantToEdit : function(origin, data, editProcessedCb) {
+        /*********************************************************************
+         *
+         * PROTECTED METHODS
+         *
+         *********************************************************************/
+
+        _wantToEdit : function(origin, data, editProcessedCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
-            var me              = "{0}::ModelProcessesState::edit".fmt(iName);
+            var me              = "{0}::ModelProcessesState::_wantToEdit".fmt(iName);
             var self            = this;
 
             var callbackGiven   = _.func(editProcessedCb);
             var __return        = function(err) {
                 if (_.def(err)) {
                     callbackGiven ? editProcessedCb(err) :
-                                    _l.error(me, "Error occurred : ", _.stringify(err));
+                            _l.error(me, "Error occurred : ", _.stringify(err));
                 } else {
                     callbackGiven ? editProcessedCb() :
-                                    null;
+                            null;
                 }
             };
 
             if (!this._stateProcessingInitialized) {
                 __return({
                     message : "State object is not initialized (correctly), call _initStateProcessing() in " +
-                              "your model-constructor first"
+                    "your model-constructor first"
                 });
                 return;
             }
@@ -375,9 +381,9 @@
             });
         },
 
-        wantToUpdateToRemote : function(origin, data, updateReadyCb) {
+        _wantToUpdateToRemote : function(origin, data, updateReadyCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
-            var me              = "{0}::ModelProcessesState::wantToUpdateToRemote".fmt(iName);
+            var me              = "{0}::ModelProcessesState::_wantToUpdateToRemote".fmt(iName);
             var self            = this;
 
             var callbackGiven   = _.func(updateReadyCb);
@@ -389,7 +395,7 @@
             if (!this._stateProcessingInitialized) {
                 __returnError({
                     message : "State object is not initialized (correctly), call _initStateProcessing() in " +
-                              "your model-constructor first"
+                    "your model-constructor first"
                 });
                 return;
             }
@@ -404,7 +410,7 @@
             var validityState = this._state.globalValidity;
             if (!_.empty(validityState)) {
                 _l.error(me, ("The following properties are invalid, " +
-                              "unable to update to remote: {0}").fmt(_.stringify(validityState)));
+                "unable to update to remote: {0}").fmt(_.stringify(validityState)));
                 return;
             }
 
@@ -428,9 +434,9 @@
             });
         },
 
-        wantToUpdateFromRemote : function(origin, data, updateReadyCb) {
+        _wantToUpdateFromRemote : function(origin, data, updateReadyCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
-            var me              = "{0}::ModelProcessesState::wantToUpdateFromRemote".fmt(iName);
+            var me              = "{0}::ModelProcessesState::_wantToUpdateFromRemote".fmt(iName);
             var self            = this;
 
             var callbackGiven   = _.func(updateReadyCb);
@@ -442,7 +448,7 @@
             if (!this._stateProcessingInitialized) {
                 __returnError({
                     message : "State object is not initialized (correctly), call _initStateProcessing() in " +
-                              "your model-constructor first"
+                    "your model-constructor first"
                 });
                 return;
             }
@@ -457,7 +463,7 @@
             var syncState = this._state.globalSyncing;
             if ((syncState < SyncState.SYNCED) && (syncState != SyncState.UNKNOWN)) {
                 _l.info(me, ("There are local changes, update to server first. " +
-                             "(SyncState = {0})").fmt(SyncStateName[syncState]));
+                "(SyncState = {0})").fmt(SyncStateName[syncState]));
 
                 if (callbackGiven) { updateReadyCb(); }
                 return;
@@ -469,12 +475,6 @@
 
             this._updateFromRemote(updateReadyCb);
         },
-
-        /*********************************************************************
-         *
-         * PROTECTED METHODS
-         *
-         *********************************************************************/
 
         _initStateProcessing : function() {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
@@ -1370,7 +1370,7 @@
             var isEqual = false;
 
             var customFuncName  = this._getCustomMethodName("_isEqual", property);
-            var customFunc      = this[customFuncName];
+            var customFunc      = this["_" + customFuncName];
             if (_.func(customFunc)) {
                 isEqual = customFunc(oldVal, newVal);
                 if (!_.bool(isEqual)) {
