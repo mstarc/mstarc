@@ -23,7 +23,7 @@
         },
 
         _isReady    : false,
-        _eventQueue : [],
+        _eventQueue : null,
 
         /**
          *
@@ -62,6 +62,8 @@
         constructor: function (componentName, config) {
             var me = "{0}::MVCComponent::constructor".fmt(componentName);
             NS.MVCComponent.$super.call(this, componentName);
+
+            this._eventQueue = [];
 
             this._addConfigProperties(config);
         },
