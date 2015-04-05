@@ -218,13 +218,8 @@
         _processEventQueue : function() {
             var self    = this;
             var event   = null;
-            while (!_.empty(this._eventQueue)) {
-                event = this._eventQueue.shift();
 
-                if (!_.obj(event)) {
-                    continue;
-                }
-
+            var __scheduleEventProcessing = function(event) {
                 //schedule in new run loop
                 setTimeout(function() {
                     var eventMethodName = "_" + event.name;
@@ -237,10 +232,20 @@
                         event.callback = _.ensureFunc(event.callback);
                         event.callback({
                             message : "UNEXPECTED : MVC component {0} does not have a method to process {1} events"
-                                      .fmt(iName, event.name)
+                                    .fmt(iName, event.name)
                         });
                     }
                 }, 0);
+            };
+
+            while (!_.empty(this._eventQueue)) {
+                event = this._eventQueue.shift();
+
+                if (!_.obj(event)) {
+                    continue;
+                }
+
+                __scheduleEventProcessing(event);
             }
         },
 
