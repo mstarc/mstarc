@@ -155,6 +155,19 @@
 
             var eventMethodName = "_" + eventName;
 
+            if (!this.isValid()) {
+                var errMsg = "MVC Component {0} is not valid, " +
+                             "unable to process event {1}".fmt(this.getIName(), eventName);
+                if (_.func(eventProcessedCb)) {
+                    eventProcessedCb({
+                        message : errMsg
+                    });
+                } else {
+                    _l.error(me, errMsg);
+                }
+                return;
+            }
+
             if (!_.hasMethod(this, eventMethodName)) {
                 _l.debug(me, "No method available to process event {0}, not processing".fmt(eventName));
                 return success;

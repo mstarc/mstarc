@@ -515,6 +515,8 @@
                 validity        : {}
             };
 
+            this._stateProcessingInitialized    = true;
+
             if (_.array(this._properties)) {
                 var property = null;
                 var result   = null;
@@ -530,7 +532,6 @@
                 _l.warn(me, "No _properties array defined in Model");
             }
 
-            this._stateProcessingInitialized    = true;
             this._state.globalValidity          = this._calcGlobalValidityState();
 
             return this._stateProcessingInitialized;
