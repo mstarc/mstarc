@@ -268,6 +268,7 @@
         _wantToUpdateToRemote : function(origin, data, updateReadyCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
             var me              = "{0}::ControllerProcessesState::_wantToUpdateToRemote".fmt(iName);
+            var self            = this;
 
             var callbackGiven   = _.func(updateReadyCb);
 
@@ -299,6 +300,9 @@
         },
 
         _onUpdatedToRemote : function(err, updateReadyCb) {
+            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
+            var me              = "{0}::ControllerProcessesState::_onUpdatedToRemote".fmt(iName);
+
             var callbackGiven   = _.func(updateReadyCb);
             callbackGiven ? updateReadyCb(err) :  _l.error(me, "Error occurred : ", _.stringify(err));
         },

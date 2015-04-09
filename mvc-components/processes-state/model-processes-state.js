@@ -310,11 +310,11 @@
             var callbackGiven   = _.func(editProcessedCb);
             var __return        = function(err) {
                 if (_.def(err)) {
-                    callbackGiven ? editProcessedCb(err) :
-                            _l.error(me, "Error occurred : ", _.stringify(err));
+                    self._updateGlobalErrorState(err, function() {
+                        callbackGiven ? editProcessedCb(err) : _l.error(me, "Error occurred : ", _.stringify(err));
+                    });
                 } else {
-                    callbackGiven ? editProcessedCb() :
-                            null;
+                    callbackGiven ? editProcessedCb() : null;
                 }
             };
 
@@ -389,7 +389,9 @@
             var callbackGiven   = _.func(updateReadyCb);
 
             var __returnError   = function(err) {
-                callbackGiven ? updateReadyCb(err) :  _l.error(me, "Error occurred : ", _.stringify(err));
+                self._updateGlobalErrorState(err, function() {
+                    callbackGiven ? updateReadyCb(err) :  _l.error(me, "Error occurred : ", _.stringify(err));
+                });
             };
 
             if (!this._stateProcessingInitialized) {
@@ -409,8 +411,10 @@
 
             var validityState = this._state.globalValidity;
             if (!_.empty(validityState)) {
-                _l.error(me, ("The following properties are invalid, " +
-                "unable to update to remote: {0}").fmt(_.stringify(validityState)));
+                __returnError({
+                    message : ("The following properties are invalid, " +
+                               "unable to update to remote: {0}").fmt(validityState.join(", "))
+                });
                 return;
             }
 
@@ -442,13 +446,15 @@
             var callbackGiven   = _.func(updateReadyCb);
 
             var __returnError   = function(err) {
-                callbackGiven ? updateReadyCb(err) :  _l.error(me, "Error occurred : ", _.stringify(err));
+                self._updateGlobalErrorState(err, function() {
+                    callbackGiven ? updateReadyCb(err) :  _l.error(me, "Error occurred : ", _.stringify(err));
+                });
             };
 
             if (!this._stateProcessingInitialized) {
                 __returnError({
                     message : "State object is not initialized (correctly), call _initStateProcessing() in " +
-                    "your model-constructor first"
+                              "your model-constructor first"
                 });
                 return;
             }
@@ -474,6 +480,34 @@
             }
 
             this._updateFromRemote(updateReadyCb);
+        },
+
+        _updateFromRemote : function(updateReadyCb) {
+            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
+            var me              = "{0}::ModelProcessesState::_updateFromRemote".fmt(iName);
+
+            var errStr          = "_updateFromRemote method not implemented, " +
+                    "please implement in your {0} class".fmt(iName);
+
+            _l.error(me, errStr);
+
+            _.ensureFunc(updateReadyCb)({
+                message : errStr
+            });
+        },
+
+        _updateToRemote : function(updateReadyCb) {
+            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
+            var me              = "{0}::ModelProcessesState::_updateToRemote".fmt(iName);
+
+            var errStr          = "_updateToRemote method not implemented, " +
+                    "please implement in your {0} class".fmt(iName);
+
+            _l.error(me, errStr);
+
+            _.ensureFunc(updateReadyCb)({
+                message : errStr
+            });
         },
 
         _initStateProcessing : function() {
@@ -537,33 +571,6 @@
             return this._stateProcessingInitialized;
         },
 
-        _updateFromRemote : function(updateReadyCb) {
-            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
-            var me              = "{0}::ModelProcessesState::_updateFromRemote".fmt(iName);
-
-            var errStr          = "_updateFromRemote method not implemented, " +
-                                  "please implement in your {0} class".fmt(iName);
-
-            _l.error(me, errStr);
-
-            _.ensureFunc(updateReadyCb)({
-                message : errStr
-            });
-        },
-
-        _updateToRemote : function(updateReadyCb) {
-            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
-            var me              = "{0}::ModelProcessesState::_updateToRemote".fmt(iName);
-
-            var errStr          = "_updateToRemote method not implemented, " +
-                                  "please implement in your {0} class".fmt(iName);
-
-            _l.error(me, errStr);
-
-            _.ensureFunc(updateReadyCb)({
-                message : errStr
-            });
-        },
 
         /**
          *
