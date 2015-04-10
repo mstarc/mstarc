@@ -42,7 +42,7 @@
          *
          * IMPORTANT : The class that uses this mixin must implement the following methods :
          *
-         * - _updateToRemote(updateReadyCb), with updateReadyCb(err)
+         * - _updateToRemote(updateReadyCb), with updateReadyCb(responseData, err)
          * - _updateFromRemote(updateReadyCb), with updateReadyCb(err)
          *
          * IMPORTANT : The class that uses this mixin must define an array _properties, containing all
@@ -86,7 +86,8 @@
          * When the updateToRemote() method is called it is checked if globalSyncing is NOT_SYNCED.
          * If so, the _updateToRemote(updateToRemoteReadyCb) method is called. This method needs to be overridden by
          * the class that uses this mixin and implements the actual updating to the server.
-         * When the updateToRemoteReadyCb(err) callback is called without error the globalSyncing is set to SYNCED.
+         * When the updateToRemoteReadyCb(responseData, err) callback is called without error the globalSyncing is
+         * set to SYNCED.
          *
          * The updateFromRemote()/wantToUpdateFromRemote() basically calls the _updateFromRemote() method if the
          * global syncing state is SYNCED. This method needs to be implemented by the class that uses this mixin.
@@ -196,6 +197,93 @@
 
         /**
          *
+         * Set the model data state according to the property values given in <data>
+         *
+         * @param {object} data
+         * @param {function} [readyCb]  function(err)
+         *
+         */
+        setDataState : function(data, readyCb) {
+            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
+            var me              = "{0}::ModelProcessesState::setDataState".fmt(iName);
+            var self            = this;
+
+            var callbackGiven   = _.func(readyCb);
+            var __return        = function(err) {
+                if (_.def(err)) {
+                    self._updateGlobalErrorState(err, function() {
+                        callbackGiven ? readyCb(err) : _l.error(me, "Error occurred : ", _.stringify(err));
+                    });
+                } else {
+                    self._updateGlobalErrorState(null, function() {
+                        callbackGiven ? readyCb() : null;
+                    });
+                }
+            };
+
+            if (!this._stateProcessingInitialized) {
+                __return({
+                    message : "State object is not initialized (correctly), call _initStateProcessing() in " +
+                              "your model-constructor first"
+                });
+                return;
+            }
+
+            if (!this.isValid()) {
+                __return({
+                    message : "Model is invalid, unable to set new data"
+                });
+                return;
+            }
+
+            data = data || {};
+
+            var err = {
+                error_hash : {}
+            };
+
+            var properties = Object.getOwnPropertyNames(data);
+            _.iterateASync(
+                    properties.length,
+                    function(i, iterCb) {
+                        var property = properties[i];
+                        self._updateDataState(property, data[property], function(updated, _err) {
+                            var success = !_.def(_err);
+                            if (!success) {
+                                err.error_hash["Updating data property {0}".fmt(property)] = _err;
+                            }
+
+                            iterCb(success)
+                        });
+                    },
+                    function(success) {
+                        if (success) {
+                            __return();
+                        } else {
+                            __return({
+                                message : "Unable to set all data properties",
+                                originalError : err
+                            });
+                        }
+                    });
+        },
+
+        /**
+         *
+         * Get data state object
+         *
+         * @returns {*}
+         *
+         */
+        getDataState : function() {
+            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
+            var me              = "{0}::ModelProcessesState::getDataState".fmt(iName);
+
+            return this._getState("data");
+        },
+
+        /**
+         *
          * Get data state for <property>
          *
          * @param property
@@ -203,9 +291,9 @@
          * @returns {*}
          *
          */
-        getState : function(property) {
+        getDataStateFor : function(property) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
-            var me              = "{0}::ModelProcessesState::getState".fmt(iName);
+            var me              = "{0}::ModelProcessesState::getDataStateFor".fmt(iName);
 
             var value           = null;
 
@@ -314,7 +402,9 @@
                         callbackGiven ? editProcessedCb(err) : _l.error(me, "Error occurred : ", _.stringify(err));
                     });
                 } else {
-                    callbackGiven ? editProcessedCb() : null;
+                    self._updateGlobalErrorState(null, function() {
+                        callbackGiven ? editProcessedCb() : null;
+                    });
                 }
             };
 
@@ -381,29 +471,35 @@
             });
         },
 
+        //updateReadyCb(responseData, err)
         _wantToUpdateToRemote : function(origin, data, updateReadyCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
             var me              = "{0}::ModelProcessesState::_wantToUpdateToRemote".fmt(iName);
             var self            = this;
 
             var callbackGiven   = _.func(updateReadyCb);
-
-            var __returnError   = function(err) {
-                self._updateGlobalErrorState(err, function() {
-                    callbackGiven ? updateReadyCb(err) :  _l.error(me, "Error occurred : ", _.stringify(err));
-                });
+            var __return        = function(responseData, err) {
+                if (_.def(err)) {
+                    self._updateGlobalErrorState(err, function() {
+                        callbackGiven ? updateReadyCb(responseData, err) : _l.error(me, "Error occurred : ", _.stringify(err));
+                    });
+                } else {
+                    self._updateGlobalErrorState(null, function() {
+                        callbackGiven ? updateReadyCb(responseData) : null;
+                    });
+                }
             };
 
             if (!this._stateProcessingInitialized) {
-                __returnError({
+                __return(null, {
                     message : "State object is not initialized (correctly), call _initStateProcessing() in " +
-                    "your model-constructor first"
+                              "your model-constructor first"
                 });
                 return;
             }
 
             if (this.isValid() === false) {
-                __returnError({
+                __return(null, {
                     message : "Model is invalid, unable to update to remote"
                 });
                 return;
@@ -411,7 +507,7 @@
 
             var validityState = this._state.globalValidity;
             if (!_.empty(validityState)) {
-                __returnError({
+                __return(null, {
                     message : ("The following properties are invalid, " +
                                "unable to update to remote: {0}").fmt(validityState.join(", "))
                 });
@@ -420,20 +516,22 @@
 
             var syncState = this._state.globalSyncing;
             if (syncState > SyncState.NOT_SYNCED) {
-                _l.info(me, "Syncing not required, global sync state is : {0}".fmt(SyncStateName[syncState]));
-
-                if (callbackGiven) { updateReadyCb(); }
+                __return(null, {
+                    message : "Syncing not required, global sync state is : {0}".fmt(SyncStateName[syncState])
+                });
                 return;
             }
 
-            this._updateToRemote(function(err) {
+            this._updateToRemote(function(responseData, err) {
                 if (_.def(err)) {
-                    __returnError(err);
+                    __return(null, err);
                     return;
                 }
 
-                self._updateGlobalSyncState(SyncState.SYNCED, function(updated, err) {
-                    updateReadyCb(err);
+                self._updateGlobalSyncState(SyncState.SYNCED, function() {
+                    self._updateGlobalErrorState(null, function() {
+                        __return(responseData, err);
+                    });
                 });
             });
         },
@@ -444,15 +542,20 @@
             var self            = this;
 
             var callbackGiven   = _.func(updateReadyCb);
-
-            var __returnError   = function(err) {
-                self._updateGlobalErrorState(err, function() {
-                    callbackGiven ? updateReadyCb(err) :  _l.error(me, "Error occurred : ", _.stringify(err));
-                });
+            var __return        = function(err) {
+                if (_.def(err)) {
+                    self._updateGlobalErrorState(err, function() {
+                        callbackGiven ? updateReadyCb(err) : _l.error(me, "Error occurred : ", _.stringify(err));
+                    });
+                } else {
+                    self._updateGlobalErrorState(null, function() {
+                        callbackGiven ? updateReadyCb() : null;
+                    });
+                }
             };
 
             if (!this._stateProcessingInitialized) {
-                __returnError({
+                __return({
                     message : "State object is not initialized (correctly), call _initStateProcessing() in " +
                               "your model-constructor first"
                 });
@@ -460,7 +563,7 @@
             }
 
             if (this.isValid() === false) {
-                __returnError({
+                __return({
                     message : "Model is invalid, unable to update to remote"
                 });
                 return;
@@ -469,9 +572,9 @@
             var syncState = this._state.globalSyncing;
             if ((syncState < SyncState.SYNCED) && (syncState != SyncState.UNKNOWN)) {
                 _l.info(me, ("There are local changes, update to server first. " +
-                "(SyncState = {0})").fmt(SyncStateName[syncState]));
+                             "(SyncState = {0})").fmt(SyncStateName[syncState]));
 
-                if (callbackGiven) { updateReadyCb(); }
+                __return();
                 return;
             }
 
@@ -479,7 +582,13 @@
                 _l.debug(me, "SyncState is UNKNOWN, continuing anyway ...");
             }
 
-            this._updateFromRemote(updateReadyCb);
+            this._updateFromRemote(function(data, err) {
+                if (_.def(err)) {
+                    __return(err);
+                } else {
+                    self.setDataState(data, __return);
+                }
+            });
         },
 
         _updateFromRemote : function(updateReadyCb) {
@@ -612,7 +721,7 @@
          *
          * Updates the data state <property> to <value> and notifies connected controllers that it is updated.
          * After updating the controllers, if it is defined, a custom method
-         * _updateDataStateFor<Property>(value, readyCb) is called.
+         * _updatedDataStateFor<Property>(value, readyCb) is called.
          *
          * Only when both steps are completed the optional updateProcessedCb(updated, err) is called.
          *
@@ -692,9 +801,9 @@
                     err.error_hash["dispatched dataStateUpdated to controllers"] = _err;
                 }
 
-                var result = self._callCustomMethod("_updateDataStateFor", property, value, function(_err) {
+                var result = self._callCustomMethod("_updatedDataStateFor", property, value, function(_err) {
                     if (_.def(_err)) {
-                        err.error_hash["calling custom method _updateDataStateFor {0}".fmt(property)] = _err;
+                        err.error_hash["calling custom method _updatedDataStateFor {0}".fmt(property)] = _err;
                     }
 
                     __return(!_.empty(err.error_hash) ? err : null);
@@ -703,7 +812,7 @@
                 if (!result.called) {
                     __return(!_.empty(err.error_hash) ? err : null);
                 } else if (result.result !== true) {
-                    err.error_hash["initiating custom method _updateDataStateFor {0}".fmt(property)] = {
+                    err.error_hash["initiating custom method _updatedDataStateFor {0}".fmt(property)] = {
                         message : "A problem occurred initiating custom method"
                     };
 
