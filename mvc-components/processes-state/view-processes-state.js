@@ -248,12 +248,16 @@
 
             var callbackGiven   = _.func(eventProcessedCb);
 
-            var __returnError   = function(errStr) {
-                callbackGiven ? eventProcessedCb({ message : errStr }) :  _l.error(me, errStr);
+            var __return   = function(err) {
+                if (_.def(err)) {
+                    callbackGiven ? eventProcessedCb(err) :  _l.error(me, "Error occurred : " + _.stringify(err));
+                } else {
+                    callbackGiven ? eventProcessedCb() : null;
+                }
             };
 
             if (!this._stateProcessingInitialized) {
-                __returnError({
+                __return({
                     message : "State processing is not initialized (correctly), call _initStateProcessing() in " +
                               "your view-constructor first"
                 });
@@ -261,12 +265,16 @@
             }
 
             if (this.isValid() === false) {
-                __returnError("ReactView is invalid, unable to process {0} event".fmt(eventName));
+                __return({
+                    message : "ReactView is invalid, unable to process {0} event".fmt(eventName)
+                });
                 return;
             }
 
             if (!this.isRendered()) {
-                __returnError("View is not rendered, unable to process {0} event".fmt(eventName));
+                __return({
+                    message : "View is not rendered, unable to process {0} event".fmt(eventName)
+                });
                 return;
             }
 
@@ -275,7 +283,9 @@
             var value           = isGlobal ? data : _.get(data, 'data', dataDesc);
 
             if (!isGlobal && (!_.string(property) || _.empty(property))) {
-                __returnError("No valid data property provided, unable to process {0} event".fmt(eventName));
+                __return({
+                    message : "No valid data property provided, unable to process {0} event".fmt(eventName)
+                });
                 return;
             }
 
@@ -287,7 +297,7 @@
                 stateUpdateFunc(property, value);
             }
 
-            this._scheduleRenderState(eventProcessedCb);
+            this._scheduleRenderState(__return);
         }
 
     });
