@@ -92,8 +92,11 @@
          * For convenience these events can called using the following public methods:
          *
          *  edit(property, value, editProcessedCb)      edit local property value
-         *  updateToRemote(updateReadyCb)               update local property values to server
+         *  updateToRemote(updateReadyCb)               send local property values to server
+         *                                              updateReadyCb(responseData, err)
+         *
          *  updateFromRemote(updateReadyCb)             get remote property values from server
+         *                                              updateReadyCb(err)
          *
          *
          * @class   ControllerProcessesState
@@ -272,18 +275,22 @@
 
             var callbackGiven   = _.func(updateReadyCb);
 
-            var __returnError   = function(errStr) {
-                callbackGiven ? updateReadyCb({ message : errStr }) :  _l.error(me, errStr);
+            var __returnError   = function(err) {
+                callbackGiven ? updateReadyCb(err) :  _l.error(me, "Error occurred : " + _.stringify(err));
             };
 
             if (!this._stateProcessingInitialized) {
-                __returnError("State processing is not initialized (correctly), call _initStateProcessing() in " +
-                              "your controller-constructor first");
+                __returnError({
+                    message : "State processing is not initialized (correctly), call _initStateProcessing() in " +
+                              "your controller-constructor first"
+                });
                 return;
             }
 
             if (this.isValid() === false) {
-                __returnError("Controller is invalid, unable to update to remote");
+                __returnError({
+                    message : "Controller is invalid, unable to update to remote"
+                });
                 return;
             }
 
@@ -294,12 +301,19 @@
             this._dispatchToModel(
                     "wantToUpdateToRemote",
                     data,
-                    function(err) {
-                        self._onUpdatedToRemote(err, updateReadyCb);
+                    function(responseData, err) {
+                        self._onUpdatedToRemote(responseData, err, function(err) {
+                            if (_.def(err)) {
+                                __returnError(err);
+                                return;
+                            }
+
+                            if (callbackGiven) { updateReadyCb(); }
+                        });
                     });
         },
 
-        _onUpdatedToRemote : function(err, updateReadyCb) {
+        _onUpdatedToRemote : function(responseData, err, updateReadyCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
             var me              = "{0}::ControllerProcessesState::_onUpdatedToRemote".fmt(iName);
 
@@ -314,18 +328,22 @@
 
             var callbackGiven   = _.func(updateReadyCb);
 
-            var __returnError   = function(errStr) {
-                callbackGiven ? updateReadyCb({ message : errStr }) :  _l.error(me, errStr);
+            var __returnError   = function(err) {
+                callbackGiven ? updateReadyCb(err) :  _l.error(me, "Error occurred : " + _.stringify(err));
             };
 
             if (!this._stateProcessingInitialized) {
-                __returnError("State processing is not initialized (correctly), call _initStateProcessing() in " +
-                              "your controller-constructor first");
+                __returnError({
+                    message : "State processing is not initialized (correctly), call _initStateProcessing() in " +
+                               "your controller-constructor first"
+                });
                 return;
             }
 
             if (this.isValid() === false) {
-                __returnError("Controller is invalid, unable to update to remote");
+                __returnError({
+                    message : "Controller is invalid, unable to update to remote"
+                });
                 return;
             }
 
@@ -337,7 +355,14 @@
                     "wantToUpdateFromRemote",
                     data,
                     function(err) {
-                        self._onUpdatedFromRemote(err, updateReadyCb);
+                        self._onUpdatedFromRemote(err, function(err) {
+                            if (_.def(err)) {
+                                __returnError(err);
+                                return;
+                            }
+
+                            if (callbackGiven) { updateReadyCb(); }
+                        });
                     });
         },
 
