@@ -197,79 +197,6 @@
 
         /**
          *
-         * Set the model data state according to the property values given in <data>
-         *
-         * @param {object} data
-         * @param {function} [readyCb]  function(err)
-         *
-         */
-        setDataState : function(data, readyCb) {
-            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
-            var me              = "{0}::ModelProcessesState::setDataState".fmt(iName);
-            var self            = this;
-
-            var callbackGiven   = _.func(readyCb);
-            var __return        = function(err) {
-                if (_.def(err)) {
-                    self._updateGlobalErrorState(err, function() {
-                        callbackGiven ? readyCb(err) : _l.error(me, "Error occurred : ", _.stringify(err));
-                    });
-                } else {
-                    self._updateGlobalErrorState(null, function() {
-                        callbackGiven ? readyCb() : null;
-                    });
-                }
-            };
-
-            if (!this._stateProcessingInitialized) {
-                __return({
-                    message : "State object is not initialized (correctly), call _initStateProcessing() in " +
-                              "your model-constructor first"
-                });
-                return;
-            }
-
-            if (!this.isValid()) {
-                __return({
-                    message : "Model is invalid, unable to set new data"
-                });
-                return;
-            }
-
-            data = data || {};
-
-            var err = {
-                error_hash : {}
-            };
-
-            var properties = Object.getOwnPropertyNames(data);
-            _.iterateASync(
-                    properties.length,
-                    function(i, iterCb) {
-                        var property = properties[i];
-                        self._updateDataState(property, data[property], function(updated, _err) {
-                            var success = !_.def(_err);
-                            if (!success) {
-                                err.error_hash["Updating data property {0}".fmt(property)] = _err;
-                            }
-
-                            iterCb(success)
-                        });
-                    },
-                    function(success) {
-                        if (success) {
-                            __return();
-                        } else {
-                            __return({
-                                message : "Unable to set all data properties",
-                                originalError : err
-                            });
-                        }
-                    });
-        },
-
-        /**
-         *
          * Get data state object
          *
          * @returns {*}
@@ -389,6 +316,130 @@
          * PROTECTED METHODS
          *
          *********************************************************************/
+
+        /**
+         *
+         * Resets any data state property back to null
+         *
+         * @param {function} [resetProcessedCb]     function(err)
+         *
+         */
+        _wantToResetDataState : function(origin, data, resetProcessedCb) {
+            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
+            var me              = "{0}::ModelProcessesState::resetDataState".fmt(iName);
+            var self            = this;
+
+            var callbackGiven   = _.func(resetProcessedCb);
+            var __return        = function(err) {
+                if (_.def(err)) {
+                    self._updateGlobalErrorState(err, function() {
+                        callbackGiven ? resetProcessedCb(err) : _l.error(me, "Error occurred : ", _.stringify(err));
+                    });
+                } else {
+                    self._updateGlobalErrorState(null, function() {
+                        resetProcessedCb ? readyCb() : null;
+                    });
+                }
+            };
+
+            if (!this._stateProcessingInitialized) {
+                __return({
+                    message : "State object is not initialized (correctly), call _initStateProcessing() in " +
+                              "your model-constructor first"
+                });
+                return;
+            }
+
+            if (!this.isValid()) {
+                __return({
+                    message : "Model is invalid, unable to reset data state"
+                });
+                return;
+            }
+
+            var oldData = this.getDataState() || {};
+            var newData = {};
+
+            var properties = Object.getOwnPropertyNames(oldData);
+            _.map(properties, function(prop) {
+                newData[prop] = null;
+            });
+
+            this._wantToSetDataState(origin, newData, __return);
+        },
+
+        /**
+         *
+         * Set the model data state according to the property values given in <data>
+         *
+         * @param {object} data
+         * @param {function} [setDataProcessedCb]  function(err)
+         *
+         */
+        _wantToSetDataState : function(origin, data, setDataProcessedCb) {
+            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
+            var me              = "{0}::ModelProcessesState::_wantToSetDataState".fmt(iName);
+            var self            = this;
+
+            var callbackGiven   = _.func(setDataProcessedCb);
+            var __return        = function(err) {
+                if (_.def(err)) {
+                    self._updateGlobalErrorState(err, function() {
+                        callbackGiven ? setDataProcessedCb(err) : _l.error(me, "Error occurred : ", _.stringify(err));
+                    });
+                } else {
+                    self._updateGlobalErrorState(null, function() {
+                        callbackGiven ? setDataProcessedCb() : null;
+                    });
+                }
+            };
+
+            if (!this._stateProcessingInitialized) {
+                __return({
+                    message : "State object is not initialized (correctly), call _initStateProcessing() in " +
+                              "your model-constructor first"
+                });
+                return;
+            }
+
+            if (!this.isValid()) {
+                __return({
+                    message : "Model is invalid, unable to set new data"
+                });
+                return;
+            }
+
+            data = data || {};
+
+            var err = {
+                error_hash : {}
+            };
+
+            var properties = Object.getOwnPropertyNames(data);
+            _.iterateASync(
+                    properties.length,
+                    function(i, iterCb) {
+                        var property = properties[i];
+                        self._updateDataState(property, data[property], function(updated, _err) {
+                            var success = !_.def(_err);
+                            if (!success) {
+                                err.error_hash["Updating data property {0}".fmt(property)] = _err;
+                            }
+
+                            iterCb(success)
+                        });
+                    },
+                    function(success) {
+                        if (success) {
+                            __return();
+                        } else {
+                            __return({
+                                message : "Unable to set all data properties",
+                                originalError : err
+                            });
+                        }
+                    });
+        },
 
         _wantToEdit : function(origin, data, editProcessedCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
@@ -586,7 +637,7 @@
                 if (_.def(err)) {
                     __return(err);
                 } else {
-                    self.setDataState(data, __return);
+                    self._wantToSetDataState(origin, data, __return);
                 }
             });
         },
