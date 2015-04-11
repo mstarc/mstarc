@@ -420,13 +420,17 @@
                     properties.length,
                     function(i, iterCb) {
                         var property = properties[i];
-                        self._updateDataState(property, data[property], function(updated, _err) {
+
+                        self._wantToEdit(origin, {
+                            what : property,
+                            data : data[property]
+                        }, function(_err) {
                             var success = !_.def(_err);
                             if (!success) {
-                                err.error_hash["Updating data property {0}".fmt(property)] = _err;
+                                err.error_hash["Editing data property {0}".fmt(property)] = _err;
                             }
 
-                            iterCb(success)
+                            iterCb(success);
                         });
                     },
                     function(success) {
