@@ -91,6 +91,7 @@
          *
          * For convenience these events can called using the following public methods:
          *
+         *  resetData()                                 reset all data in model
          *  edit(property, value, editProcessedCb)      edit local property value
          *  updateToRemote(updateReadyCb)               send local property values to server
          *                                              updateReadyCb(responseData, err)
@@ -105,6 +106,10 @@
          * @for     Controller
          *
          */
+
+        resetData : function(readyCb) {
+            this._dispatchToModel("wantToResetDataState", null, readyCb);
+        },
 
         /**
          *
