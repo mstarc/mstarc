@@ -27,6 +27,17 @@
         _stateUpdated               : null,
         _stateProcessingInitialized : false,
 
+        /**
+         *
+         * {
+         *  <property name1> : <default value property 1>,
+         *
+         *  ...
+         *
+         *  <property nameN> : <default value property N>,
+         * }
+         *
+         */
         _properties                 : null,
 
         /**
@@ -45,8 +56,8 @@
          * - _updateToRemote(updateReadyCb), with updateReadyCb(responseData, err)
          * - _updateFromRemote(updateReadyCb), with updateReadyCb(err)
          *
-         * IMPORTANT : The class that uses this mixin must define an array _properties, containing all
-         *             model property names.
+         * IMPORTANT : The class that uses this mixin must define an object _properties, defining all
+         *             model property names (keys) and default values (values).
          *
          *
          * *** TODO START : FUTURE : COMPLEX STATE ***
@@ -357,15 +368,14 @@
                 return;
             }
 
-            var oldData = this.getDataState() || {};
-            var newData = {};
+            var defaultData = {};
+            if (_.obj(this._properties) && !_.empty(this._properties)) {
+                defaultData = _.clone(this._properties);
+            } else {
+                _l.warn(me, "No _properties object defined in Model");
+            }
 
-            var properties = Object.getOwnPropertyNames(oldData);
-            _.map(properties, function(prop) {
-                newData[prop] = null;
-            });
-
-            this._wantToSetDataState(origin, newData, __return);
+            this._wantToSetDataState(origin, defaultData, __return);
         },
 
         /**
@@ -419,21 +429,33 @@
             _.iterateASync(
                     properties.length,
                     function(i, iterCb) {
-                        var property = properties[i];
+                        var property    = properties[i];
+                        var value       = data[property];
 
-                        self._wantToEdit(origin, {
-                            what : property,
-                            data : data[property]
-                        }, function(_err) {
+                        self._updateDataState(property, value, function(updated, _err) {
                             var success = !_.def(_err);
                             if (!success) {
-                                err.error_hash["Editing data property {0}".fmt(property)] = _err;
+                                err.error_hash["Updating data property {0}".fmt(property)] = _err;
+                                iterCb(success);
+
+                                return;
                             }
 
-                            iterCb(success);
+                            var result = self._callCustomMethod("_validate", property, value, null, false);
+                            self._updateValidityState(property, result.result, function(updated, _err) {
+                                var success = !_.def(_err);
+                                if (!success) {
+                                    err.error_hash["Updating validity of data property {0}".fmt(property)] = _err;
+                                }
+
+                                iterCb(success);
+                            });
                         });
                     },
                     function(success) {
+
+                        self._state.globalValidity = self._calcGlobalValidityState();
+
                         if (success) {
                             __return();
                         } else {
@@ -713,28 +735,8 @@
                 validity        : {}
             };
 
-            this._stateProcessingInitialized    = true;
-
-            if (_.array(this._properties)) {
-                var property = null;
-                var result   = null;
-                var value    = null;
-                for (var idx in this._properties) {
-                    property    = this._properties[idx];
-                    value       = this._state.data[property];
-
-                    result      = this._callCustomMethod("_validate", property, value, null, false);
-                    this._state.validity[property] = result.result;
-                }
-            } else {
-                _l.warn(me, "No _properties array defined in Model");
-            }
-
-            this._state.globalValidity          = this._calcGlobalValidityState();
-
-            return this._stateProcessingInitialized;
+            return (this._stateProcessingInitialized = true);
         },
-
 
         /**
          *
