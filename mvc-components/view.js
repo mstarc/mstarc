@@ -70,7 +70,7 @@
 
             this._valid = true;
             if (!this._setup()) {
-                _l.error(me, "Controller setup failed, controller wil not function properly");
+                _l.error(me, "View setup failed, controller wil not function properly");
                 this._valid = false;
             }
         },
