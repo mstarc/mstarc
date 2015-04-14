@@ -195,6 +195,23 @@
             return (manager = this._managers[name]);
         },
 
+        isMobile : function() {
+            return !_.empty(navigator.userAgent.match(/(iPhone|iPod|iPad|Android|BlackBerry|IEMobile)/)) ||
+                    this.isFirefoxOS();
+        },
+
+        isiOS : function() {
+            return !_.empty(navigator.userAgent.match(/(iPhone|iPod|iPad)/));
+        },
+
+        isAndroid : function() {
+            return !_.empty(navigator.userAgent.match(/(Android)/));
+        },
+
+        isFirefoxOS : function() {
+            return !_.empty(navigator.userAgent.match(/(Mozilla.*Mobile)/));
+        },
+
         /*********************************************************************
          *
          * PROTECTED METHODS
