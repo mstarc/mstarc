@@ -284,7 +284,7 @@
 
             if (!isGlobal && (!_.string(property) || _.empty(property))) {
                 __return({
-                    message : "No valid data property provided, unable to process {0} event".fmt(eventName)
+                    message : "No valid data property name provided, unable to process {0} event".fmt(eventName)
                 });
                 return;
             }

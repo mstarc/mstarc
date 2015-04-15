@@ -412,7 +412,7 @@
             var forward         = true;
 
             if (!isGlobal && (!_.string(property) || _.empty(property))) {
-                __returnError("No valid data property provided, unable to process {0} event".fmt(eventName));
+                __returnError("No valid data property name provided, unable to process {0} event".fmt(eventName));
                 return;
             }
 

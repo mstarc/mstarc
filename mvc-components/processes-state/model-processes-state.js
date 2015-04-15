@@ -236,7 +236,7 @@
             var value           = null;
 
             if (!_.string(property) || _.empty(property)) {
-                _l.error(me, "Property is not valid, unable to get data state for property");
+                _l.error(me, "Property name is not valid, unable to get data state for property");
                 return value;
             }
 
@@ -279,7 +279,7 @@
             var value           = null;
 
             if (!_.string(property) || _.empty(property)) {
-                _l.error(me, "Property is not valid, unable to get error state for property");
+                _l.error(me, "Property name is not valid, unable to get error state for property");
                 return value;
             }
 
@@ -315,7 +315,7 @@
             var value           = null;
 
             if (!_.string(property) || _.empty(property)) {
-                _l.error(me, "Property is not valid, unable to get error state for property");
+                _l.error(me, "Property name is not valid, unable to get error state for property");
                 return value;
             }
 
@@ -508,7 +508,7 @@
 
                 if (_.def(_err)) {
                     __return({
-                        message       : "Unable to update property [{0}] to edited value".fmt(property),
+                        message       : "Unable to update property [{0}] to edited value".fmt(property || "[UNKNOWN]"),
                         originalError : _err
                     });
                     return;
@@ -831,7 +831,7 @@
 
             if (!_.string(property) || _.empty(property)) {
                 __return({
-                    message : "Property is not valid, unable to update data state and notify controllers"
+                    message : "Property name is not valid, unable to update data state and notify controllers"
                 });
                 return;
             }
@@ -1210,7 +1210,7 @@
 
             if (!_.string(property) || _.empty(property)) {
                 __return({
-                    message : "Property is not valid, unable to update error state and notify controllers"
+                    message : "Property name is not valid, unable to update error state and notify controllers"
                 });
                 return;
             }
@@ -1448,7 +1448,7 @@
 
             if (!_.string(property) || _.empty(property)) {
                 __return({
-                    message : "Property is not valid, unable to update validity state and notify controllers"
+                    message : "Property name is not valid, unable to update validity state and notify controllers"
                 });
                 return;
             }
