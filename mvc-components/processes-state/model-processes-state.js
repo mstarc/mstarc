@@ -81,11 +81,11 @@
          * - wantToUpdateToRemote
          * - wantToUpdateFromRemote
          *
-         * if validation has been implemented for the property using a method with the following naming convention:
+         * if validation has been implemented for the property use a async method with the following naming convention:
          *
-         *  _validate<Property>(value)
+         *  _validate<Property>(value, validationCb)
          *
-         * This method must return a validity object, see below.
+         * With validationCb(validity, err), where validity is the validity object or null (when valid), see below.
          *
          * TODO : Complex state syncing
          * Further, the global sync state is set to NOT_SYNCED when the new value for the property is
@@ -441,19 +441,34 @@
                                 return;
                             }
 
-                            var result = self._callCustomMethod("_validate", property, value, null, false);
-                            self._updateValidityState(property, result.result, function(updated, _err) {
-                                var success = !_.def(_err);
-                                if (!success) {
-                                    err.error_hash["Updating validity of data property {0}".fmt(property)] = _err;
-                                }
+                            self._callCustomMethod(
+                                    "_validate",
+                                    property,
+                                    value,
+                                    function(validity, _err) {
+                                        var success = !_.def(_err);
+                                        if (!success) {
+                                            var action = "Calculating validity for data property {0}".fmt(property);
+                                            err.error_hash[action] = _err;
 
-                                iterCb(success);
-                            });
+                                            iterCb(success);
+                                            return;
+                                        }
+
+                                        self._updateValidityState(property, validity, function(updated, _err) {
+                                            var success = !_.def(_err);
+                                            if (!success) {
+                                                var action = "Updating validity of data property {0}".fmt(property);
+                                                err.error_hash[action] = _err;
+                                            }
+
+                                            iterCb(success);
+                                        });
+                                    },
+                                    false);
                         });
                     },
                     function(success) {
-
                         self._state.globalValidity = self._calcGlobalValidityState();
 
                         if (success) {
@@ -504,18 +519,19 @@
             var property        = _.get(data, 'what', dataDesc);
             var newValue        = _.get(data, 'data', dataDesc);
 
-            this._updateDataState(property, newValue, function(updated, _err) {
+            this._updateDataState(property, newValue, function(updated, err) {
 
-                if (_.def(_err)) {
+                if (_.def(err)) {
                     __return({
                         message       : "Unable to update property [{0}] to edited value".fmt(property || "[UNKNOWN]"),
-                        originalError : _err
+                        originalError : err
                     });
                     return;
                 }
 
                 if (!updated) {
                     _l.debug(me, "Property [{0}] was not updated, stopping".fmt(property));
+                    __return();
                     return;
                 }
 
@@ -523,15 +539,26 @@
 
                 parallelTasks["update global sync state"] = function(cbReady) {
                     self._updateGlobalSyncState(SyncState.NOT_SYNCED, function(updated, err) {
-                        cbReady(err)
+                        cbReady(err);
                     });
                 };
 
                 parallelTasks["update validity of property {0}".fmt(property)] = function(cbReady) {
-                    var result = self._callCustomMethod("_validate", property, newValue, null, false);
-                    self._updateValidityState(property, result.result, function(updated, err) {
-                        cbReady(err);
-                    });
+                    self._callCustomMethod(
+                        "_validate",
+                        property,
+                        newValue,
+                        function(validity, err) {
+                            if (_.def(err)) {
+                                cbReady(err);
+                                return;
+                            }
+
+                            self._updateValidityState(property, validity, function(updated, err) {
+                                cbReady(err);
+                            });
+                        },
+                        false);
                 };
 
                 _.execASync(parallelTasks, function(errHash) {
@@ -778,7 +805,7 @@
          *
          * Updates the data state <property> to <value> and notifies connected controllers that it is updated.
          * After updating the controllers, if it is defined, a custom method
-         * _updatedDataStateFor<Property>(value, readyCb) is called.
+         * _dataStateUpdatedFor<Property>(value, readyCb) is called.
          *
          * Only when both steps are completed the optional updateProcessedCb(updated, err) is called.
          *
@@ -858,9 +885,9 @@
                     err.error_hash["dispatched dataStateUpdated to controllers"] = _err;
                 }
 
-                var result = self._callCustomMethod("_updatedDataStateFor", property, value, function(_err) {
+                var result = self._callCustomMethod("_dataStateUpdatedFor", property, value, function(_err) {
                     if (_.def(_err)) {
-                        err.error_hash["calling custom method _updatedDataStateFor {0}".fmt(property)] = _err;
+                        err.error_hash["calling custom method _dataStateUpdatedFor {0}".fmt(property)] = _err;
                     }
 
                     __return(!_.empty(err.error_hash) ? err : null);
@@ -869,7 +896,7 @@
                 if (!result.called) {
                     __return(!_.empty(err.error_hash) ? err : null);
                 } else if (result.result !== true) {
-                    err.error_hash["initiating custom method _updatedDataStateFor {0}".fmt(property)] = {
+                    err.error_hash["initiating custom method _dataStateUpdatedFor {0}".fmt(property)] = {
                         message : "A problem occurred initiating custom method"
                     };
 
@@ -1238,7 +1265,7 @@
                         err.error_hash["updating globalErrorState"] = _err;
                     }
 
-                    var result = self._callCustomMethod("_errorStateUpdatedFor", "", value, function (_err) {
+                    var result = self._callCustomMethod("_errorStateUpdatedFor", property, value, function (_err) {
                         if (_.def(_err)) {
                             err.error_hash["calling custom method _errorStateUpdatedFor {0}".fmt(property)] = _err;
                         }
@@ -1477,7 +1504,7 @@
                         err.error_hash["updating globalValidityState"] = _err;
                     }
 
-                    var result = self._callCustomMethod("_validityStateUpdatedFor", "", value, function (_err) {
+                    var result = self._callCustomMethod("_validityStateUpdatedFor", property, value, function (_err) {
                         if (_.def(_err)) {
                             err.error_hash["calling custom method _validityStateUpdatedFor {0}".fmt(property)] = _err;
                         }
