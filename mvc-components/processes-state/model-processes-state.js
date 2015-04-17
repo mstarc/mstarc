@@ -332,6 +332,8 @@
          *
          * Resets any data state property back to null
          *
+         * Calls custom method _onResetDataState() (if exists) before resetting the state
+         *
          * @param {function} [resetProcessedCb]     function(err)
          *
          */
@@ -367,6 +369,8 @@
                 });
                 return;
             }
+
+            this._callCustomMethod("_onResetDataState", "", null);
 
             var defaultData = {};
             if (_.obj(this._properties) && !_.empty(this._properties)) {
