@@ -350,7 +350,7 @@
                     });
                 } else {
                     self._updateGlobalErrorState(null, function() {
-                        resetProcessedCb ? readyCb() : null;
+                        resetProcessedCb ? resetProcessedCb() : null;
                     });
                 }
             };
