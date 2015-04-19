@@ -22,10 +22,6 @@
                 methods : ['createElement', 'render']
             },
 
-            /*REQUIRED_REACT_CLASS_API : {
-                methods : ['mountComponent', 'receiveComponent']
-            },*/
-
             createReactElement : function(type, config, children) {
                 return React.createElement(type, config, children);
             }

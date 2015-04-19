@@ -142,8 +142,8 @@
 
             var controllers     = this.getConnectedComponents();
 
-            var checkList       = {};
-            var controllerNames = {};
+            var checkList       = new DataMap();
+            var controllerNames = new DataMap();
             var numControllers  = 0;
             var controller      = null;
             for (var name in controllers) {
@@ -152,16 +152,16 @@
                 }
 
                 numControllers++;
-                controller                  = controllers[name];
-                checkList[controller]       = false;
-                controllerNames[controller]  = name;
+                controller = controllers[name];
+                checkList.set(controller, false);
+                controllerNames.set(controller, name);
             }
 
             var numUniqueControllersChecked = 0;
             var __handleCallback = function(controller, cancelled, _err) {
-                var controllerName = controllerNames[controller] || "[UNKNOWN]";
+                var controllerName = controllerNames.get(controller) || "[UNKNOWN]";
 
-                if (checkList[controller] === true) {
+                if (checkList.get(controller) === true) {
                     _l.error(me, ("UNEXPECTED : callback already called for processing " +
                                   "of event [{0}] by processor {1}, doing nothing").fmt(eventName, controllerName));
                     return;
@@ -175,7 +175,7 @@
                     err.error_hash[action] = _err;
                 }
 
-                checkList[controller] = true;
+                checkList.set(controller, true);
                 numUniqueControllersChecked++;
 
                 if (numUniqueControllersChecked == numControllers) {

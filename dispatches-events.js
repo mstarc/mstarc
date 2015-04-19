@@ -11,6 +11,8 @@
     var _l          = NS.logger;
     var Class       = window.jsface.Class;
 
+    var DataMap     = NS.DataMap;
+
     NS.DispatchesEvents = Class({
 
         _processors          : null,
@@ -121,7 +123,7 @@
             var success = false;
 
             this._processors        = this._processors || {};
-            this._processorsIndex   = this._processorsIndex || {};
+            this._processorsIndex   = this._processorsIndex || (new DataMap());
 
             if (!_.string(processorName)) {
                 _l.error(me, "No processor name given, unable to register");
@@ -146,7 +148,7 @@
             _l.info(me, "Registering [{0}]".fmt(processorName));
 
             this._processors[processorName] = processor;
-            this._processorsIndex[processor] = processorName;
+            this._processorsIndex.set(processor,  processorName);
 
             this._didRegister(processorName, processor);
 
@@ -170,14 +172,14 @@
             var success = false;
 
             this._processors        = this._processors || {};
-            this._processorsIndex   = this._processorsIndex || {};
+            this._processorsIndex   = this._processorsIndex || (new DataMap());
 
             if (!_.obj(processor)) {
                 _l.error(me, "No processor instance given, unable to deregister");
                 return success;
             }
 
-            var processorName = this._processorsIndex[processor];
+            var processorName = this._processorsIndex.get(processor);
             if (!_.def(processorName)) {
                 _l.error(me, "Object not found as a registered processor, unable to deregister");
                 return success;
@@ -384,12 +386,12 @@
         _dispatchEvent : function(processor, eventName, eventData, eventProcessedCb) {
             var success = false;
 
-            this._processorsIndex   = this._processorsIndex || {};
+            this._processorsIndex   = this._processorsIndex || (new DataMap());
 
             if (!_.hasMethod(processor, 'processEvent')) {
                 var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
                 var me              = "{0}::DispatchesEvents::_dispatchEvent".fmt(iName);
-                var processorName   = this._processorsIndex[processor] || "[UNKNOWN]";
+                var processorName   = this._processorsIndex.get(processor) || "[UNKNOWN]";
 
                 _l.error(me, "Processor {0} has no processEvent method, unable to dispatch event".fmt(processorName));
                 return success;
@@ -419,8 +421,8 @@
             var success             = false;
             var self                = this;
 
-            this._processorsIndex  = this._processorsIndex || {};
-            this._throttleTimers   = this._throttleTimers || {};
+            this._processorsIndex  = this._processorsIndex || (new DataMap());
+            this._throttleTimers   = this._throttleTimers || (new DataMap());
 
             if ((!_.number(throttleDelay)) || (throttleDelay < 0)) {
                 throttleDelay = 300;
@@ -429,15 +431,15 @@
             if (!_.hasMethod(processor, 'processEvent')) {
                 var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
                 var me              = "{0}::DispatchesEvents::_scheduleEventDispatch".fmt(iName);
-                var processorName   = this._processorsIndex[processor] || "[UNKNOWN]";
+                var processorName   = this._processorsIndex.get(processor) || "[UNKNOWN]";
 
                 _l.error(me, "Processor {0} has no processEvent method, unable to dispatch event".fmt(processorName));
                 return success;
             }
 
-            this._throttleTimers[processor] = this._throttleTimers[processor] || {};
+            this._throttleTimers.set(processor, this._throttleTimers.get(processor) || {});
 
-            var timerInfo   = this._throttleTimers[processor][eventName];
+            var timerInfo   = this._throttleTimers.get(processor)[eventName];
             var timer       = _.get(timerInfo, 'timer');
             if (_.def(timer)) {
                 clearTimeout(timer);
@@ -445,20 +447,20 @@
                 //Call cancelledCb if provided
                 _.ensureFunc(timerInfo.cancelledCb)();
 
-                this._throttleTimers[processor][eventName]  = null;
-                timerInfo                                   = null;
+                this._throttleTimers.get(processor)[eventName]  = null;
+                timerInfo                                       = null;
             }
 
-            this._throttleTimers[processor][eventName] = {
+            this._throttleTimers.get(processor)[eventName] = {
 
                 cancelledCb : cancelledCb,
 
                 timer       : setTimeout(function() {
-                    self._throttleTimers[processor][eventName] = null;
+                    self._throttleTimers.get(processor)[eventName] = null;
 
                     if (!processor.processEvent(self, eventName, eventData, eventProcessedCb)) {
 
-                        var processorName  = self._processorsIndex[processor] || "[UNKNOWN]";
+                        var processorName  = self._processorsIndex.get(processor) || "[UNKNOWN]";
 
                         eventProcessedCb({
                             message : "Unable to initiate processing of event {0} at processor {1}"
