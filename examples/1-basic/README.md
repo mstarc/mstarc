@@ -1,17 +1,17 @@
 __Basic Example__
 
 In this example no external rendering or state manager library is used; it represents the most simplistic skeleton 
-M*C app possible, only using the MVC architecture using event dispatching.
+M\*C app possible, only using the MVC architecture using event dispatching.
 
 The example has two views; one home view with a button allowing the user to start a counting process and
 a counter view that shows the counting. In the counter view the user can stop counting using a button, this will 
 bring the app back in the home view.
 
-This is not at all a realistic example because M*C is specifically created to allow to build and properly
-structure large web applications. Further is does not show all the features M*C has to offer to create 
+This is not at all a realistic example because M\*C is specifically created to allow to build and properly
+structure large web applications. Further is does not show all the features M\*C has to offer to create 
 complex applications.
 
-_Which M*C features are used in this example?_
+_Which M\*C features are used in this example?_
 
 | Feature | Used in this example? |
 | --------|:---------------------:|
