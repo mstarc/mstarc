@@ -22,11 +22,13 @@ _Which M*C features are used in this example?_
 |Standardised state processing for errors, input validation and data synchronisation | NO | 
 | | |
 |Data resource managers | NO |
+| | |
 |HTTP API Client | NO |
 | | |
 |Offline storage | NO |
 | | |
 |Simple state manager | YES |
+| | |
 |External state manager such as Stativus | NO |
 
  
