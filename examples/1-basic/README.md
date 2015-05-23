@@ -29,8 +29,9 @@ _Which M\*C features are used in this example?_
 | | |
 |Simple state manager | YES |
 | | |
-|External state manager such as Stativus | NO |
-
+|Use of external state manager such as Stativus | NO |
+| | |
+|Use of external rendering engine such as Reactjs | NO |
  
 
 
