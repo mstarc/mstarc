@@ -132,15 +132,11 @@
             return true;
         },
 
-        showUI : function() {
-            var me      = "HomeController::showUI";
-
-            if (!this.isValid()) {
-                _l.error(me, "Controller not valid, unable to process showUI.");
-                return;
-            }
-
-            this._dispatchToView("showUI");
+        showUI : function(show, readyCb) {
+            this._dispatchToView(
+                    "wantToShowUI",
+                    show,
+                    readyCb);
         },
 
         /*********************************************************************

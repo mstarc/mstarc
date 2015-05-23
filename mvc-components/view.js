@@ -192,6 +192,11 @@
             _l.debug(me, "Not implemented, nothing to do");
         },
 
+        _wantToShowUI: function(controller, show) {
+            var me = "{0}::View::_wantToShowUI".fmt(this.getIName());
+            _l.error(me, "Not implemented, please implement this in your (base) view.");
+        },
+
         /**
          *
          * @param eventName
