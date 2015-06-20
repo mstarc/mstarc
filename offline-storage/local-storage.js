@@ -49,7 +49,7 @@
             var me = "LocalStorage::constructor";
             NS.LocalStorage.$super.call(this);
 
-            this._valid = _.obj(window['localStorage']);
+            this._valid = _.obj(window.localStorage);
         },
 
         /*************************************************************************
