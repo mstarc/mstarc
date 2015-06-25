@@ -158,6 +158,10 @@
             return component;
         },
 
+        setComponent : function(componentName, component) {
+            this._MVCComponents[componentName] = component;
+        },
+
         getComponent : function(componentName) {
             return this._MVCComponents[componentName];
         },
