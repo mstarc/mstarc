@@ -175,6 +175,10 @@
             }
         },
 
+        getStateManager : function() {
+            return this._stateManager;
+        },
+
         getService : function(name) {
             var me      = "Application:getService";
             var service = null;
