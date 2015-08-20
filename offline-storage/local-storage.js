@@ -55,21 +55,21 @@
             var me = "LocalStorage::constructor";
             NS.LocalStorage.$super.call(this);
 
-            this._valid = _.interfaceAdheres(window['localStorage'], NS.LocalStorage.REQUIRED_LOCAL_STORAGE_API);
+            try {
+                this._valid = _.interfaceAdheres(window['localStorage'], NS.LocalStorage.REQUIRED_LOCAL_STORAGE_API);
 
-            if (this._valid) {
-                try {
+                if (!this._valid) {
+                    _l.error(me, "Local storage not available in this browser, it does not have the expected API. " +
+                                 "LocalStorage will not function")
+                } else {
                     localStorage.setItem("__MSTARC_IS_AWESOME__", "true");
-                } catch(e) {
-                    _l.error(me, "Local storage is not functional in this browser. " +
-                                 "LocalStorage will not function");
-                    _l.error(me, e.stack);
-
-                    this._valid = false;
                 }
-            } else {
-                _l.error(me, "Local storage not available in this browser, it does not have the expected API. " +
-                             "LocalStorage will not function")
+            } catch(e) {
+                _l.error(me, "Local storage is not functional in this browser. " +
+                             "LocalStorage will not function");
+                _l.error(me, e.stack);
+
+                this._valid = false;
             }
         },
 
