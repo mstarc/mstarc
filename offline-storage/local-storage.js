@@ -35,6 +35,12 @@
 
     NS.LocalStorage = Class(Storage, {
 
+        $statics : {
+            REQUIRED_LOCAL_STORAGE_API : {
+                methods : ['getItem', 'setItem', 'removeItem', 'clear']
+            }
+        },
+
         /**
          *
          * An Key-Value storage based on the browser's localStorage implementation
@@ -49,7 +55,22 @@
             var me = "LocalStorage::constructor";
             NS.LocalStorage.$super.call(this);
 
-            this._valid = _.obj(window['localStorage']);
+            this._valid = _.interfaceAdheres(window['localStorage'], NS.LocalStorage.REQUIRED_LOCAL_STORAGE_API);
+
+            if (this._valid) {
+                try {
+                    localStorage.setItem("__MSTARC_IS_AWESOME__", "true");
+                } catch(e) {
+                    _l.error(me, "Local storage is not functional in this browser. " +
+                                 "LocalStorage will not function");
+                    _l.error(me, e.stack);
+
+                    this._valid = false;
+                }
+            } else {
+                _l.error(me, "Local storage not available in this browser, it does not have the expected API. " +
+                             "LocalStorage will not function")
+            }
         },
 
         /*************************************************************************
