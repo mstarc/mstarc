@@ -704,7 +704,7 @@
             var me              = "{0}::ModelProcessesState::_updateFromRemote".fmt(iName);
 
             var errStr          = "_updateFromRemote method not implemented, " +
-                    "please implement in your {0} class".fmt(iName);
+                                  "please implement in your {0} class".fmt(iName);
 
             _l.error(me, errStr);
 
@@ -718,7 +718,7 @@
             var me              = "{0}::ModelProcessesState::_updateToRemote".fmt(iName);
 
             var errStr          = "_updateToRemote method not implemented, " +
-                    "please implement in your {0} class".fmt(iName);
+                                  "please implement in your {0} class".fmt(iName);
 
             _l.error(me, errStr);
 
