@@ -86,6 +86,29 @@
             }
         },
 
+        latest: function(numberOfResources, filter, cbReady, props) {
+            var me = "ResourceManager::last";
+
+            var valid = _.validate(me, {this: ["isValid"]}, "Unable to retrieve latest resources.", cbReady);
+            if(!valid) return;
+
+            cbReady = _.ensureFunc(cbReady);
+            this._get('latest', ""+numberOfResources, function(data, err) {
+                var _err = null;
+                if (_.def(err)) {
+                    _err = {
+                        message         : "Unable to retrieve latest {0} resources.".fmt(numberOfResources || "[unknown]"),
+                        originalError   : err
+                    };
+
+                    cbReady(null, _err);
+                    return;
+                }
+
+                cbReady(data, err);
+            });
+        },
+
         /*********************************************************************
          *
          * PROTECTED METHODS
