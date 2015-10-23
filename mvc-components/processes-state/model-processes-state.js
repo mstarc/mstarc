@@ -1517,7 +1517,11 @@
                     });
 
                     if (!result.called) {
-                        updateProcessedCb(updated, !_.empty(err.error_hash) ? err : null);
+                        if(callbackGiven) {
+                            updateProcessedCb(updated, !_.empty(err.error_hash) ? err : null);
+                        } else if (!_.empty(err.error_hash)) {
+                            _l.error(me, "Error occurred : ", _.stringify(err));
+                        }
                     } else if (result.result === false) {
                         err.error_hash["Initiating custom method _validityStateUpdatedFor {0}".fmt(property)] = {
                             message : "Problem occurred initiating"
