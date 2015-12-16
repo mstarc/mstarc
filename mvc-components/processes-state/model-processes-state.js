@@ -75,7 +75,7 @@
          *  * global error state
          *  * validity state of properties
          *
-         * The mixin processes two types of incoming events :
+         * The mixin processes three types of incoming events :
          *
          * - wantToEdit
          * - wantToUpdateToRemote
@@ -445,7 +445,7 @@
                                 return;
                             }
 
-                            self._callCustomMethod(
+                            var result = self._callCustomMethod(
                                     "_validate",
                                     property,
                                     value,
@@ -470,6 +470,10 @@
                                         });
                                     },
                                     false);
+
+                            if (!result.called) {
+                                iterCb(true);
+                            }
                         });
                     },
                     function(success) {
@@ -548,21 +552,25 @@
                 };
 
                 parallelTasks["update validity of property {0}".fmt(property)] = function(cbReady) {
-                    self._callCustomMethod(
-                        "_validate",
-                        property,
-                        newValue,
-                        function(validity, err) {
-                            if (_.def(err)) {
-                                cbReady(err);
-                                return;
-                            }
+                    var result = self._callCustomMethod(
+                            "_validate",
+                            property,
+                            newValue,
+                            function(validity, err) {
+                                if (_.def(err)) {
+                                    cbReady(err);
+                                    return;
+                                }
 
-                            self._updateValidityState(property, validity, function(updated, err) {
-                                cbReady(err);
-                            });
-                        },
-                        false);
+                                self._updateValidityState(property, validity, function(updated, err) {
+                                    cbReady(err);
+                                });
+                            },
+                            false);
+
+                    if (!result.called) {
+                        cbReady();
+                    }
                 };
 
                 _.execASync(parallelTasks, function(errHash) {
@@ -895,16 +903,10 @@
                     }
 
                     __return(!_.empty(err.error_hash) ? err : null);
-                });
+                }, false);
 
                 if (!result.called) {
                     __return(!_.empty(err.error_hash) ? err : null);
-                } else if (result.result !== true) {
-                    err.error_hash["initiating custom method _dataStateUpdatedFor {0}".fmt(property)] = {
-                        message : "A problem occurred initiating custom method"
-                    };
-
-                    __return(err);
                 }
             },
             {
@@ -980,16 +982,10 @@
                     }
 
                     __return(!_.empty(err.error_hash) ? err : null);
-                });
+                }, false);
 
                 if (!result.called) {
                     __return(!_.empty(err.error_hash) ? err : null);
-                } else if (result.result !== false) {
-                    err.error_hash["initiating custom method _globalSyncStateUpdated"] = {
-                        message : "A problem occurred initiating custom method"
-                    };
-
-                    __return(err);
                 }
             });
         },
@@ -1172,16 +1168,10 @@
                     }
 
                     __return(!_.empty(err.error_hash) ? err : null);
-                });
+                }, false);
 
                 if (!result.called) {
                     __return(!_.empty(err.error_hash) ? err : null);
-                } else if (result.result !== false) {
-                    err.error_hash["initiating custom method _globalErrorStateUpdated"] = {
-                        message : "A problem occurred initiating custom method _globalErrorStateUpdated"
-                    };
-
-                    __return(err);
                 }
             });
         },
@@ -1275,16 +1265,10 @@
                         }
 
                         __return(!_.empty(err.error_hash) ? err : null);
-                    });
+                    }, false);
 
                     if (!result.called) {
                         __return(!_.empty(err.error_hash) ? err : null);
-                    } else if (result.result === false) {
-                        err.error_hash["Initiating custom method _errorStateUpdatedFor {0}".fmt(property)] = {
-                            message : "Problem occurred initiating"
-                        };
-
-                        __return(err);
                     }
                 });
             });
@@ -1410,16 +1394,10 @@
                     }
 
                     __return(!_.empty(err.error_hash) ? err : null);
-                });
+                }, false);
 
                 if (!result.called) {
                     __return(!_.empty(err.error_hash) ? err : null);
-                } else if (result.result !== false) {
-                    err.error_hash["initiating custom method _globalValidityStateUpdated"] = {
-                        message : "A problem occurred initiating"
-                    };
-
-                    __return(err);
                 }
             });
         },
@@ -1514,7 +1492,7 @@
                         }
 
                         __return(!_.empty(err.error_hash) ? err : null);
-                    });
+                    }, false);
 
                     if (!result.called) {
                         if(callbackGiven) {
@@ -1522,12 +1500,6 @@
                         } else if (!_.empty(err.error_hash)) {
                             _l.error(me, "Error occurred : ", _.stringify(err));
                         }
-                    } else if (result.result === false) {
-                        err.error_hash["Initiating custom method _validityStateUpdatedFor {0}".fmt(property)] = {
-                            message : "Problem occurred initiating"
-                        };
-
-                        __return(err);
                     }
                 });
             });
