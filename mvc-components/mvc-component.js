@@ -149,6 +149,14 @@
             return false;
         },
 
+        /**
+         *
+         * @param origin
+         * @param eventName
+         * @param eventData
+         * @param eventProcessedCb      function(result, err)
+         * @returns {boolean}
+         */
         processEvent : function(origin, eventName, eventData, eventProcessedCb) {
             var me      = "{0}::MVCComponent::processEvent".fmt(this.getIName());
             var success = false;
@@ -156,16 +164,17 @@
             var eventMethodName = "_" + eventName;
 
             if (!this.isValid()) {
-                var errMsg = "MVC Component {0} is not valid, " +
-                             "unable to process event {1}".fmt(this.getIName(), eventName);
+                var errMsg = ("MVC Component {0} is not valid, " +
+                              "unable to process event {1}").fmt(this.getIName(), eventName);
                 if (_.func(eventProcessedCb)) {
-                    eventProcessedCb({
+                    eventProcessedCb(null, {
                         message : errMsg
                     });
                 } else {
                     _l.error(me, errMsg);
                 }
-                return;
+
+                return success;
             }
 
             if (!_.hasMethod(this, eventMethodName)) {
@@ -245,7 +254,7 @@
                         var iName = self.getIName();
 
                         event.callback = _.ensureFunc(event.callback);
-                        event.callback({
+                        event.callback(null, {
                             message : "UNEXPECTED : MVC component {0} does not have a method to process {1} events"
                                     .fmt(iName, event.name)
                         });

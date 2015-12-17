@@ -54,7 +54,7 @@
          * IMPORTANT : The class that uses this mixin must implement the following methods :
          *
          * - _updateToRemote(updateReadyCb), with updateReadyCb(responseData, err)
-         * - _updateFromRemote(updateReadyCb), with updateReadyCb(err)
+         * - _updateFromRemote(updateReadyCb), with updateReadyCb(result, err)
          *
          * IMPORTANT : The class that uses this mixin must define an object _properties, defining all
          *             model property names (keys) and default values (values).
@@ -355,7 +355,9 @@
          *
          * Calls custom method _onResetModel() (if exists) before resetting model
          *
-         * @param {function} [resetProcessedCb]     function(err)
+         * @param {object} origin
+         * @param {object} data
+         * @param {function} [resetProcessedCb]     function(result, err)
          *
          */
         _wantToResetModel : function(origin, data, resetProcessedCb) {
@@ -367,11 +369,11 @@
             var __return        = function(err) {
                 if (_.def(err)) {
                     self._updateGlobalErrorState(err, function() {
-                        callbackGiven ? resetProcessedCb(err) : _l.error(me, "Error occurred : ", _.stringify(err));
+                        callbackGiven ? resetProcessedCb(false, err) : _l.error(me, "Error occurred : ", _.stringify(err));
                     });
                 } else {
                     self._updateGlobalErrorState(null, function() {
-                        resetProcessedCb ? resetProcessedCb() : null;
+                        resetProcessedCb ? resetProcessedCb(true) : null;
                     });
                 }
             };
@@ -391,7 +393,7 @@
                 return;
             }
 
-            this._callCustomMethod("_onResetModel", "", null, false);
+            this._callCustomMethod("_onResetModel", "", null, null, false);
 
             var defaultData = {};
             if (_.obj(this._properties) && !_.empty(this._properties)) {
@@ -480,8 +482,9 @@
          *
          * Set the model data state according to the property values given in <data>
          *
+         * @param {object} origin
          * @param {object} data
-         * @param {function} [setDataProcessedCb]  function(err)
+         * @param {function} [setDataProcessedCb]  function(result, err)
          *
          */
         _wantToSetDataState : function(origin, data, setDataProcessedCb) {
@@ -493,11 +496,11 @@
             var __return        = function(err) {
                 if (_.def(err)) {
                     self._updateGlobalErrorState(err, function() {
-                        callbackGiven ? setDataProcessedCb(err) : _l.error(me, "Error occurred : ", _.stringify(err));
+                        callbackGiven ? setDataProcessedCb(false, err) : _l.error(me, "Error occurred : ", _.stringify(err));
                     });
                 } else {
                     self._updateGlobalErrorState(null, function() {
-                        callbackGiven ? setDataProcessedCb() : null;
+                        callbackGiven ? setDataProcessedCb(true) : null;
                     });
                 }
             };
@@ -505,7 +508,7 @@
             if (!this._stateProcessingInitialized) {
                 __return({
                     message : "State object is not initialized (correctly), call _initStateProcessing() in " +
-                    "your model-constructor first"
+                              "your model-constructor first"
                 });
                 return;
             }
@@ -551,26 +554,35 @@
                     });
         },
 
+        /**
+         *
+         * @param origin
+         * @param data
+         * @param editProcessedCb   function(updated, err)
+         *
+         * @protected
+         *
+         */
         _wantToEdit : function(origin, data, editProcessedCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
             var me              = "{0}::ModelProcessesState::_wantToEdit".fmt(iName);
             var self            = this;
 
             var callbackGiven   = _.func(editProcessedCb);
-            var __return        = function(err) {
+            var __return        = function(updated, err) {
                 if (_.def(err)) {
                     self._updateGlobalErrorState(err, function() {
-                        callbackGiven ? editProcessedCb(err) : _l.error(me, "Error occurred : ", _.stringify(err));
+                        callbackGiven ? editProcessedCb(updated, err) : _l.error(me, "Error occurred : ", _.stringify(err));
                     });
                 } else {
                     self._updateGlobalErrorState(null, function() {
-                        callbackGiven ? editProcessedCb() : null;
+                        callbackGiven ? editProcessedCb(updated) : null;
                     });
                 }
             };
 
             if (!this._stateProcessingInitialized) {
-                __return({
+                __return(false, {
                     message : "State object is not initialized (correctly), call _initStateProcessing() in " +
                     "your model-constructor first"
                 });
@@ -578,7 +590,7 @@
             }
 
             if (!this.isValid()) {
-                __return({
+                __return(false, {
                     message : "Model is invalid, unable to edit"
                 });
                 return;
@@ -591,7 +603,7 @@
             this._updateDataState(property, newValue, function(updated, err) {
 
                 if (_.def(err)) {
-                    __return({
+                    __return(updated, {
                         message       : "Unable to update property [{0}] to edited value".fmt(property || "[UNKNOWN]"),
                         originalError : err
                     });
@@ -600,7 +612,7 @@
 
                 if (!updated) {
                     _l.debug(me, "Property [{0}] was not updated, stopping".fmt(property));
-                    __return();
+                    __return(updated);
                     return;
                 }
 
@@ -636,19 +648,18 @@
 
                 _.execASync(parallelTasks, function(errHash) {
                     if (!_.empty(errHash)) {
-                        __return({
+                        __return(updated, {
                             error_hash : errHash
                         });
                         return;
                     }
 
-                    __return();
+                    __return(updated);
                 });
 
             });
         },
 
-        //updateReadyCb(responseData, err)
         /**
          *
          * @param {object} origin
@@ -769,7 +780,7 @@
                 var validityState = self.getGlobalValidityState();
                 if (!_.empty(validityState)) {
                     readyCb(null, {
-                        message : ("Unable to {0}, the following properties " +
+                        message : ("Unable to {0}, the following fields " +
                                    "are invalid : {1}").fmt(utrAction, validityState.join(", "))
                     });
                     return;
@@ -778,7 +789,7 @@
                 readyCb();
             };
 
-            updateSteps['update to remote'] = function(data, err, readyCb) {
+            updateSteps[utrAction] = function(data, err, readyCb) {
                 self._updateToRemote(function(responseData, err) {
                     if (_.def(err)) {
                         readyCb(null, err);
@@ -796,26 +807,34 @@
             _.execInSeries(updateSteps, __return);
         },
 
+        /**
+         *
+         * @param origin
+         * @param data
+         * @param updateReadyCb     function(respondsData, err)
+         *
+         * @protected
+         */
         _wantToUpdateFromRemote : function(origin, data, updateReadyCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
             var me              = "{0}::ModelProcessesState::_wantToUpdateFromRemote".fmt(iName);
             var self            = this;
 
             var callbackGiven   = _.func(updateReadyCb);
-            var __return        = function(err) {
+            var __return        = function(respondsData, err) {
                 if (_.def(err)) {
                     self._updateGlobalErrorState(err, function() {
-                        callbackGiven ? updateReadyCb(err) : _l.error(me, "Error occurred : ", _.stringify(err));
+                        callbackGiven ? updateReadyCb(null, err) : _l.error(me, "Error occurred : ", _.stringify(err));
                     });
                 } else {
                     self._updateGlobalErrorState(null, function() {
-                        callbackGiven ? updateReadyCb() : null;
+                        callbackGiven ? updateReadyCb(respondsData) : null;
                     });
                 }
             };
 
             if (!this._stateProcessingInitialized) {
-                __return({
+                __return(null, {
                     message : "State object is not initialized (correctly), call _initStateProcessing() in " +
                               "your model-constructor first"
                 });
@@ -823,7 +842,7 @@
             }
 
             if (this.isValid() === false) {
-                __return({
+                __return(null, {
                     message : "Model is invalid, unable to update to remote"
                 });
                 return;
@@ -844,13 +863,20 @@
 
             this._updateFromRemote(function(data, err) {
                 if (_.def(err)) {
-                    __return(err);
+                    __return(data, err);
                 } else {
                     self._wantToSetDataState(origin, data, __return);
                 }
             });
         },
 
+        /**
+         *
+         * @param updateReadyCb     function(respondsData, err)
+         *
+         * @protected
+         *
+         */
         _updateFromRemote : function(updateReadyCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
             var me              = "{0}::ModelProcessesState::_updateFromRemote".fmt(iName);
@@ -860,11 +886,18 @@
 
             _l.error(me, errStr);
 
-            _.ensureFunc(updateReadyCb)({
+            _.ensureFunc(updateReadyCb)(null, {
                 message : errStr
             });
         },
 
+        /**
+         *
+         * @param updateReadyCb     function(respondsData, err)
+         *
+         * @protected
+         *
+         */
         _updateToRemote : function(updateReadyCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
             var me              = "{0}::ModelProcessesState::_updateToRemote".fmt(iName);
@@ -874,7 +907,7 @@
 
             _l.error(me, errStr);
 
-            _.ensureFunc(updateReadyCb)({
+            _.ensureFunc(updateReadyCb)(null, {
                 message : errStr
             });
         },
@@ -1077,12 +1110,12 @@
             this._dispatchToControllers("dataStateUpdated", {
                 what : property,
                 data : value
-            }, function(_err) {
+            }, function(result, _err) {
                 if (_.def(_err)) {
                     err.error_hash["dispatched dataStateUpdated to controllers"] = _err;
                 }
 
-                var result = self._callCustomMethod("_dataStateUpdatedFor", property, value, function(_err) {
+                result = self._callCustomMethod("_dataStateUpdatedFor", property, value, function(_err) {
                     if (_.def(_err)) {
                         err.error_hash["calling custom method _dataStateUpdatedFor {0}".fmt(property)] = _err;
                     }
@@ -1156,12 +1189,12 @@
             this._stateUpdated.globalSyncing = true;
             updated = true;
 
-            this._dispatchToControllers("globalSyncStateUpdated", value, function(_err) {
+            this._dispatchToControllers("globalSyncStateUpdated", value, function(result, _err) {
                 if (_.def(_err)) {
                     err.error_hash["dispatched globalSyncStateUpdated to controllers"] = _err;
                 }
 
-                var result = self._callCustomMethod("_globalSyncStateUpdated", "", value, function(_err) {
+                result = self._callCustomMethod("_globalSyncStateUpdated", "", value, function(_err) {
                     if (_.def(_err)) {
                         err.error_hash["calling custom method _globalSyncStateUpdated"] = _err;
                     }
@@ -1342,12 +1375,12 @@
             this._stateUpdated.globalError  = true;
             updated = true;
 
-            this._dispatchToControllers("globalErrorStateUpdated", value, function(_err) {
+            this._dispatchToControllers("globalErrorStateUpdated", value, function(result, _err) {
                 if (_.def(_err)) {
                     err.error_hash["dispatched globalErrorStateUpdated to controllers"] = _err;
                 }
 
-                var result = self._callCustomMethod("_globalErrorStateUpdated", "", value, function(_err) {
+                result = self._callCustomMethod("_globalErrorStateUpdated", "", value, function(_err) {
                     if (_.def(_err)) {
                         err.error_hash["calling custom method _globalErrorStateUpdated"] = _err;
                     }
@@ -1434,7 +1467,7 @@
             this._dispatchToControllers("errorStateUpdated", {
                 what : property,
                 data : value
-            }, function(_err) {
+            }, function(result, _err) {
                 if (_.def(_err)) {
                     err.error_hash["dispatched errorStateUpdated to controllers"] = _err;
                 }
@@ -1568,12 +1601,12 @@
             this._stateUpdated.globalValidity = true;
             updated = true;
 
-            this._dispatchToControllers("globalValidityStateUpdated", value, function(_err) {
+            this._dispatchToControllers("globalValidityStateUpdated", value, function(result, _err) {
                 if (_.def(_err)) {
                     err.error_hash["dispatched globalValidityStateUpdated to controllers"] = _err;
                 }
 
-                var result = self._callCustomMethod("_globalValidityStateUpdated", "", value, function(_err) {
+                result = self._callCustomMethod("_globalValidityStateUpdated", "", value, function(_err) {
                     if (_.def(_err)) {
                         err.error_hash["calling custom method _globalValidityStateUpdated"] = _err;
                     }
@@ -1661,7 +1694,7 @@
             this._dispatchToControllers("validityStateUpdated", {
                 what : property,
                 data : value
-            }, function(_err) {
+            }, function(result, _err) {
                 if (_.def(_err)) {
                     err.error_hash["dispatched validityStateUpdated to controllers"] = _err;
                 }

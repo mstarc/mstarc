@@ -176,7 +176,7 @@
          *
          * @param eventName
          * @param [eventData]
-         * @param [eventProcessedCb]
+         * @param [eventProcessedCb]                function(result, err)
          * @param {boolean} [throttle = false]      dispatch will be throttled if true
          * @param {number} [throttleDelay]          Optional custom throttleDelay, relevant when throttled = true
          * @returns {boolean}
@@ -214,7 +214,7 @@
          *
          * @param eventName
          * @param [eventData]
-         * @param [eventProcessedCb]
+         * @param [eventProcessedCb]                function(result, err)
          * @param {boolean} [throttle = false]      dispatch will be throttled if true
          * @param {number} [throttleDelay]          Optional custom throttleDelay, relevant when throttled = true
          * @returns {boolean}

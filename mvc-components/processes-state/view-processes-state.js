@@ -102,6 +102,15 @@
         },
 
 
+        /**
+         *
+         * @param property
+         * @param newValue
+         * @param editProcessedCb function(result, err)
+         *
+         * @protected
+         *
+         */
         _edit : function(property, newValue, editProcessedCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
             var me              = "{0}::ViewProcessesState::_edit".fmt(iName);
@@ -109,7 +118,7 @@
             var callbackGiven   = _.func(editProcessedCb);
 
             var __returnError   = function(errStr) {
-                callbackGiven ? editProcessedCb({ message : errStr }) :  _l.error(me, errStr);
+                callbackGiven ? editProcessedCb(null, { message : errStr }) :  _l.error(me, errStr);
             };
 
             if (!this._stateProcessingInitialized) {
@@ -207,6 +216,14 @@
                     arguments);
         },
 
+        /**
+         *
+         *
+         * @param action
+         * @param syncProcessedCb   function(result, err)
+         *
+         * @protected
+         */
         _updateToRemote : function(action, syncProcessedCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
             var me              = "{0}::ViewProcessesState::_updateToRemote".fmt(iName);
@@ -214,7 +231,7 @@
             var callbackGiven   = _.func(syncProcessedCb);
 
             var __returnError   = function(errStr) {
-                callbackGiven ? syncProcessedCb({ message : errStr }) :  _l.error(me, errStr);
+                callbackGiven ? syncProcessedCb(null, { message : errStr }) :  _l.error(me, errStr);
             };
 
             action = action || "update to remote";
@@ -254,7 +271,7 @@
 
             var __return   = function(err) {
                 if (_.def(err)) {
-                    callbackGiven ? eventProcessedCb(err) :  _l.error(me, "Error occurred : " + _.stringify(err));
+                    callbackGiven ? eventProcessedCb(null, err) :  _l.error(me, "Error occurred : " + _.stringify(err));
                 } else {
                     callbackGiven ? eventProcessedCb() : null;
                 }

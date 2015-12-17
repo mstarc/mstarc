@@ -109,7 +109,7 @@
          *
          * @param eventName
          * @param eventData
-         * @param eventProcessedCb
+         * @param eventProcessedCb  function(result, err)
          *
          * @param {object} config
          * @param {object} [config.excludedComponent=null]
@@ -120,7 +120,6 @@
          *
          * @protected
          */
-
         _dispatchToControllers : function(eventName, eventData, eventProcessedCb, config) {
             var me              = "{0}::Model::_dispatchToControllers".fmt(this.getIName());
             var success         = false;
@@ -158,7 +157,7 @@
             }
 
             var numUniqueControllersChecked = 0;
-            var __handleCallback = function(controller, cancelled, _err) {
+            var __handleCallback = function(controller, cancelled, result, _err) {
                 var controllerName = controllerNames.get(controller) || "[UNKNOWN]";
 
                 if (checkList.get(controller) === true) {
@@ -179,17 +178,17 @@
                 numUniqueControllersChecked++;
 
                 if (numUniqueControllersChecked == numControllers) {
-                    eventProcessedCb(!_.empty(err.error_hash) ? err : null);
+                    eventProcessedCb(result, !_.empty(err.error_hash) ? err : null);
                 }
             };
 
             if (!throttle) {
-                success = this._dispatch(eventName, eventData, function(controller, err) {
-                    __handleCallback(controller, false, err);
+                success = this._dispatch(eventName, eventData, function(controller, result, err) {
+                    __handleCallback(controller, false, result, err);
                 }, excludedComponent);
             } else {
-                success = this._dispatchThrottled(eventName, eventData, function(controller, cancelled, err) {
-                    __handleCallback(controller, cancelled, err);
+                success = this._dispatchThrottled(eventName, eventData, function(controller, cancelled, result, err) {
+                    __handleCallback(controller, cancelled, result, err);
                 }, throttleDelay, excludedComponent);
             }
 

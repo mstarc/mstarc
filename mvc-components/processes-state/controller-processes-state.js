@@ -97,7 +97,7 @@
          *                                              updateReadyCb(responseData, err)
          *
          *  updateFromRemote(updateReadyCb)             get remote property values from server
-         *                                              updateReadyCb(err)
+         *                                              updateReadyCb(responseData, err)
          *
          *
          * @class   ControllerProcessesState
@@ -117,7 +117,7 @@
          *
          * @param property          property for which to edit a value
          * @param value             New value for property
-         * @param editProcessedCb   function(err), callback called when the edit has been processed throughout
+         * @param editProcessedCb   function(result, err), callback called when the edit has been processed throughout
          *                          the whole MVC
          *
          */
@@ -131,6 +131,11 @@
                     editProcessedCb);
         },
 
+        /**
+         *
+         * @param updateReadyCb     function(result, err), value of result depends on implementation
+         *
+         */
         updateFromRemote : function(updateReadyCb) {
             this._wantToUpdateFromRemote(
                     this,
@@ -138,6 +143,11 @@
                     updateReadyCb);
         },
 
+        /**
+         *
+         * @param updateToRemoteCb     function(result, err), value of result depends on implementation
+         *
+         */
         updateToRemote : function(updateToRemoteCb) {
             this._wantToUpdateToRemote(
                     this,
@@ -236,7 +246,7 @@
             var callbackGiven   = _.func(editProcessedCb);
 
             var __returnError   = function(errStr) {
-                callbackGiven ? editProcessedCb({ message : errStr }) :  _l.error(me, errStr);
+                callbackGiven ? editProcessedCb(null, { message : errStr }) :  _l.error(me, errStr);
             };
 
             if (!this._stateProcessingInitialized) {
@@ -281,7 +291,7 @@
             var callbackGiven   = _.func(updateReadyCb);
 
             var __returnError   = function(err) {
-                callbackGiven ? updateReadyCb(err) :  _l.error(me, "Error occurred : " + _.stringify(err));
+                callbackGiven ? updateReadyCb(null, err) :  _l.error(me, "Error occurred : " + _.stringify(err));
             };
 
             if (!this._stateProcessingInitialized) {
@@ -313,7 +323,7 @@
                                 return;
                             }
 
-                            if (callbackGiven) { updateReadyCb(); }
+                            if (callbackGiven) { updateReadyCb(responseData); }
                         });
                     });
         },
@@ -323,7 +333,7 @@
             var me              = "{0}::ControllerProcessesState::_onUpdatedToRemote".fmt(iName);
 
             var callbackGiven   = _.func(updateReadyCb);
-            callbackGiven ? updateReadyCb(err) :  _l.error(me, "Error occurred : ", _.stringify(err));
+            callbackGiven ? updateReadyCb(responseData, err) :  _l.error(me, "Error occurred : ", _.stringify(err));
         },
 
         _wantToUpdateFromRemote : function(origin, data, updateReadyCb) {
@@ -334,7 +344,7 @@
             var callbackGiven   = _.func(updateReadyCb);
 
             var __returnError   = function(err) {
-                callbackGiven ? updateReadyCb(err) :  _l.error(me, "Error occurred : " + _.stringify(err));
+                callbackGiven ? updateReadyCb(null, err) :  _l.error(me, "Error occurred : " + _.stringify(err));
             };
 
             if (!this._stateProcessingInitialized) {
@@ -359,21 +369,21 @@
             this._dispatchToModel(
                     "wantToUpdateFromRemote",
                     data,
-                    function(err) {
-                        self._onUpdatedFromRemote(err, function(err) {
+                    function(respondsData, err) {
+                        self._onUpdatedFromRemote(respondsData, err, function(err) {
                             if (_.def(err)) {
                                 __returnError(err);
                                 return;
                             }
 
-                            if (callbackGiven) { updateReadyCb(); }
+                            if (callbackGiven) { updateReadyCb(respondsData); }
                         });
                     });
         },
 
-        _onUpdatedFromRemote : function(err, updateReadyCb) {
+        _onUpdatedFromRemote : function(respondsData, err, updateReadyCb) {
             var callbackGiven   = _.func(updateReadyCb);
-            callbackGiven ? updateReadyCb(err) :  _l.error(me, "Error occurred : ", _.stringify(err));
+            callbackGiven ? updateReadyCb(respondsData, err) :  _l.error(me, "Error occurred : ", _.stringify(err));
         },
 
         _processModelEvent : function(customProcessMethodName, eventName, isGlobal, processingArguments) {
@@ -390,7 +400,7 @@
             var callbackGiven   = _.func(eventProcessedCb);
 
             var __returnError   = function(errStr) {
-                callbackGiven ? eventProcessedCb({ message : errStr }) :  _l.error(me, errStr);
+                callbackGiven ? eventProcessedCb(null, { message : errStr }) : _l.error(me, errStr);
             };
 
             if (!this._stateProcessingInitialized) {

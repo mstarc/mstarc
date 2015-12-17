@@ -80,7 +80,8 @@
          *  The eventDispatcher is the instance using this mixin
          *  The eventProcessedCb has signature:
          *
-         *      function(err), with
+         *      function(result, err), with
+         *          result an object with results or result value
          *          err an object if an error occurred
          *
          *  The processEvent method must return true if **initiation** of processing was successful, else false.
@@ -245,10 +246,12 @@
          * @param {function} [cbEventProcessed]     Optional callback called for each processor that
          *                                          finished processing. Callback signature:
          *
-         *                                          function(processor, err)
+         *                                          function(processor, result, err)
          *
          *                                          <processor> is the processor that finished processing the
          *                                          dispatched event
+         *
+         *                                          <result> is the result of processing the event by <processor>
          *
          *                                          <err> is an error object when processing the event resulted in
          *                                          an error
@@ -270,8 +273,8 @@
             cbEventProcessed = _.ensureFunc(cbEventProcessed);
 
             var __doDispatch = function(processor) {
-                return self._dispatchEvent(processor, eventName, eventData, function(err) {
-                    cbEventProcessed(processor, err);
+                return self._dispatchEvent(processor, eventName, eventData, function(result, err) {
+                    cbEventProcessed(processor, result, err);
                 });
             };
 
@@ -310,13 +313,15 @@
          *                                          finished processing or for which processing was cancelled.
          *                                          Callback signature:
          *
-         *                                          function(processor, cancelled, err)
+         *                                          function(processor, cancelled, result, err)
          *
          *                                          <processor> is the processor that finished processing the
          *                                          dispatched event, or for which processing was cancelled
          *
          *                                          <cancelled> boolean, if true, processing was cancelled, else
          *                                          false
+         *
+         *                                          <result> is the result of processing the event by <processor>
          *
          *                                          <err> is an error object when processing the event resulted in
          *                                          an error
@@ -349,8 +354,8 @@
                             processor,
                             eventName,
                             eventData,
-                            function(err) {
-                                cbEventProcessed(processor, false, err);
+                            function(result, err) {
+                                cbEventProcessed(processor, false, result, err);
                             },
                             function() {
                                 cbEventProcessed(processor, true);
@@ -374,10 +379,11 @@
          * @param {function} [eventProcessedCb]     Optional callback when the processor is ready processing the event
          *                                          Callback signature:
          *
-         *                                          function(err)
+         *                                          function(result, err)
+         *
+         *                                          <result> is the result of processing the event by <processor>
          *
          *                                          <err> is an error object when the processing resulted in error
-         *
          *
          * @returns {boolean}           True on success, else false
          *
@@ -407,7 +413,7 @@
          * @param {object} processor
          * @param {string} eventName
          * @param {*} eventData
-         * @param {function} [eventProcessedCb]      function(err)
+         * @param {function} [eventProcessedCb]      function(result, err)
          * @param {function} [cancelledCb]           function() Called for the given processor
          *                                           when scheduled event processing was cancelled
          * @param [throttleDelay=300]
