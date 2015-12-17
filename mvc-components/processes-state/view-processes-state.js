@@ -207,7 +207,7 @@
                     arguments);
         },
 
-        _updateToRemote : function(syncProcessedCb) {
+        _updateToRemote : function(action, syncProcessedCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
             var me              = "{0}::ViewProcessesState::_updateToRemote".fmt(iName);
 
@@ -216,6 +216,8 @@
             var __returnError   = function(errStr) {
                 callbackGiven ? syncProcessedCb({ message : errStr }) :  _l.error(me, errStr);
             };
+
+            action = action || "update to remote";
 
             if (!this._stateProcessingInitialized) {
                 __returnError({
@@ -232,7 +234,9 @@
 
             this._dispatchToController(
                     "wantToUpdateToRemote",
-                    null,
+                    {
+                        action : action
+                    },
                     syncProcessedCb);
         },
 
