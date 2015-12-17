@@ -272,9 +272,9 @@
          * @returns {object | null}
          *
          */
-        getErrorState : function(property) {
+        getErrorStateFor : function(property) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
-            var me              = "{0}::ModelProcessesState::getErrorState".fmt(iName);
+            var me              = "{0}::ModelProcessesState::getErrorStateFor".fmt(iName);
 
             var value           = null;
 
@@ -308,9 +308,9 @@
          * @returns {object | null}
          *
          */
-        getValidityState : function(property) {
+        getValidityStateFor : function(property) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
-            var me              = "{0}::ModelProcessesState::getValidityState".fmt(iName);
+            var me              = "{0}::ModelProcessesState::getValidityStateFor".fmt(iName);
 
             var value           = null;
 
@@ -322,6 +322,27 @@
             return _.get(this._getState("validity"), property);
         },
 
+        /**
+         *
+         * Get update state of validity for <property>
+         *
+         * @returns {object | null}
+         *
+         */
+        getValidityUpdatedState : function(property) {
+            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
+            var me              = "{0}::ModelProcessesState::getValidityUpdatedState".fmt(iName);
+
+            var value           = null;
+
+            if (!_.string(property) || _.empty(property)) {
+                _l.error(me, "Property name is not valid, unable to get error state for property");
+                return value;
+            }
+
+            return _.get(this._getUpdatedState("validity"), property);
+        },
+
         /*********************************************************************
          *
          * PROTECTED METHODS
@@ -330,14 +351,14 @@
 
         /**
          *
-         * Resets any data state property back to null
+         * Resets model
          *
-         * Calls custom method _onResetDataState() (if exists) before resetting the state
+         * Calls custom method _onResetModel() (if exists) before resetting model
          *
          * @param {function} [resetProcessedCb]     function(err)
          *
          */
-        _wantToResetDataState : function(origin, data, resetProcessedCb) {
+        _wantToResetModel : function(origin, data, resetProcessedCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
             var me              = "{0}::ModelProcessesState::resetDataState".fmt(iName);
             var self            = this;
@@ -355,6 +376,13 @@
                 }
             };
 
+            if (!this.isValid()) {
+                __return({
+                    message : "Model is invalid, unable to reset data state"
+                });
+                return;
+            }
+
             if (!this._stateProcessingInitialized) {
                 __return({
                     message : "State object is not initialized (correctly), call _initStateProcessing() in " +
@@ -363,14 +391,7 @@
                 return;
             }
 
-            if (!this.isValid()) {
-                __return({
-                    message : "Model is invalid, unable to reset data state"
-                });
-                return;
-            }
-
-            this._callCustomMethod("_onResetDataState", "", null);
+            this._callCustomMethod("_onResetModel", "", null, false);
 
             var defaultData = {};
             if (_.obj(this._properties) && !_.empty(this._properties)) {
@@ -379,7 +400,80 @@
                 _l.warn(me, "No _properties object defined in Model");
             }
 
-            this._wantToSetDataState(origin, defaultData, __return);
+            if (!this._resetStates()) {
+                __return({
+                    message : "A problem occurred resetting the internal model states, unable to reset model"
+                });
+                return;
+            }
+
+            var properties = Object.getOwnPropertyNames(defaultData);
+
+            _.iterateASync(
+                    properties.length,
+                    function(i, iterCb) {
+                        var property    = properties[i];
+                        var value       = defaultData[property];
+
+                        var resetSteps  = {};
+                        resetSteps["reset data for [{0}]".fmt(property)] = function(cbReady) {
+                            //This leads to an update because value is not updated before
+                            self._updateDataState(property, value, function(updated, _err) {
+                                //Reset updated state
+                                self._stateUpdated.data[property] = false;
+                                cbReady(null, _err);
+                            });
+                        };
+
+                        resetSteps["reset validity for [{0}]".fmt(property)] = function(data, err, cbReady) {
+                            //This leads to an update because value is not updated before
+                            self._updateValidityState(property, self.getValidityStateFor(property), function(updated, _err) {
+                                //Reset updated state
+                                self._stateUpdated.validity[property] = false;
+
+                                cbReady(null, _err);
+                            });
+                        };
+
+                        resetSteps["reset errors for [{0}]".fmt(property)] = function(data, err, cbReady) {
+                            //This leads to an update because value is not updated before
+                            self._updateErrorState(property, self.getErrorStateFor(property), function(updated, _err) {
+                                //Reset updated state
+                                self._stateUpdated.error[property] = false;
+
+                                cbReady(null, _err);
+                            });
+                        };
+
+                        _.execInSeries(resetSteps, function(data, err) {
+                            var success = !_.def(err);
+                            if (!success) {
+                                var action = "resetting states for property {0}".fmt(property);
+                                err.error_hash[action] = err;
+                            }
+
+                            iterCb(success);
+                        });
+                    },
+                    function(success) {
+                        if (success) {
+                            //Reset updated state for global states
+                            self._stateUpdated.globalValidity   = false;
+                            self._stateUpdated.globalError      = false;
+
+                            self._updateGlobalSyncState(SyncState.UNKNOWN, function(updated, err) {
+                                //Reset updated state
+                                self._stateUpdated.globalSyncing= false;
+
+                                __return(err);
+                            });
+                        } else {
+                            __return({
+                                message : "Unable to set default data properties",
+                                originalError : err
+                            });
+                        }
+                    });
         },
 
         /**
@@ -411,7 +505,7 @@
             if (!this._stateProcessingInitialized) {
                 __return({
                     message : "State object is not initialized (correctly), call _initStateProcessing() in " +
-                              "your model-constructor first"
+                    "your model-constructor first"
                 });
                 return;
             }
@@ -440,45 +534,12 @@
                             var success = !_.def(_err);
                             if (!success) {
                                 err.error_hash["Updating data property {0}".fmt(property)] = _err;
-                                iterCb(success);
-
-                                return;
                             }
 
-                            var result = self._callCustomMethod(
-                                    "_validate",
-                                    property,
-                                    value,
-                                    function(validity, _err) {
-                                        var success = !_.def(_err);
-                                        if (!success) {
-                                            var action = "Calculating validity for data property {0}".fmt(property);
-                                            err.error_hash[action] = _err;
-
-                                            iterCb(success);
-                                            return;
-                                        }
-
-                                        self._updateValidityState(property, validity, function(updated, _err) {
-                                            var success = !_.def(_err);
-                                            if (!success) {
-                                                var action = "Updating validity of data property {0}".fmt(property);
-                                                err.error_hash[action] = _err;
-                                            }
-
-                                            iterCb(success);
-                                        });
-                                    },
-                                    false);
-
-                            if (!result.called) {
-                                iterCb(true);
-                            }
+                            iterCb(success);
                         });
                     },
                     function(success) {
-                        self._state.globalValidity = self._calcGlobalValidityState();
-
                         if (success) {
                             __return();
                         } else {
@@ -588,6 +649,19 @@
         },
 
         //updateReadyCb(responseData, err)
+        /**
+         *
+         * @param {object} origin
+         *
+         * @param {object} data                 { action : "update to remote" }
+         *                                      action describes what is done when updating to remote
+         *                                      e.g. login, upload, etc.
+         *                                      default for action is "update to remote"
+         *
+         * @param {function} updateReadyCb      updateReadyCb(responseData, err)
+         *
+         * @protected
+         */
         _wantToUpdateToRemote : function(origin, data, updateReadyCb) {
             var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
             var me              = "{0}::ModelProcessesState::_wantToUpdateToRemote".fmt(iName);
@@ -606,6 +680,8 @@
                 }
             };
 
+            var utrAction = _.get(data, 'action') || "update to remote";
+
             if (!this._stateProcessingInitialized) {
                 __return(null, {
                     message : "State object is not initialized (correctly), call _initStateProcessing() in " +
@@ -616,16 +692,7 @@
 
             if (this.isValid() === false) {
                 __return(null, {
-                    message : "Model is invalid, unable to update to remote"
-                });
-                return;
-            }
-
-            var validityState = this._state.globalValidity;
-            if (!_.empty(validityState)) {
-                __return(null, {
-                    message : ("The following properties are invalid, " +
-                               "unable to update to remote: {0}").fmt(validityState.join(", "))
+                    message : "Model is invalid, unable to {0}".fmt(utrAction)
                 });
                 return;
             }
@@ -638,18 +705,95 @@
                 return;
             }
 
-            this._updateToRemote(function(responseData, err) {
-                if (_.def(err)) {
-                    __return(null, err);
+            var err = {
+                error_hash : {}
+            };
+
+            var updateSteps = {};
+            updateSteps['Update validity of properties if required'] = function(readyCb) {
+                var data    = self.getDataState() || {};
+                var props   = Object.getOwnPropertyNames(self._properties);
+
+                _.iterateASync(props.length, function(i, iterCb) {
+                    var prop = props[i];
+
+                    var validityUpdated = self.getValidityUpdatedState(prop);
+                    if (validityUpdated === true) {
+                        iterCb(true);
+                        return;
+                    }
+
+                    var result = self._callCustomMethod(
+                            "_validate",
+                            prop,
+                            data[prop],
+                            function(validity, _err) {
+                                var success = !_.def(_err);
+                                if (!success) {
+                                    var action = "Calculating validity for data property {0}".fmt(prop);
+                                    err.error_hash[action] = _err;
+
+                                    iterCb(success);
+                                    return;
+                                }
+
+                                self._updateValidityState(prop, validity, function(updated, _err) {
+                                    var success = !_.def(_err);
+                                    if (!success) {
+                                        var action = "Updating validity of data property {0}".fmt(prop);
+                                        err.error_hash[action] = _err;
+                                    }
+
+                                    iterCb(success);
+                                });
+                            },
+                            false);
+
+                    if (!result.called) {
+                        iterCb(true);
+                    }
+                },
+                function(success) {
+                    if (success) {
+                        readyCb();
+                    } else {
+                        readyCb(null, {
+                            message : "Unable to validate properties that were not validated yet",
+                            originalError : err
+                        });
+                    }
+                });
+            };
+
+            updateSteps['Check global validity of data'] = function(data, err, readyCb) {
+                var validityState = self.getGlobalValidityState();
+                if (!_.empty(validityState)) {
+                    readyCb(null, {
+                        message : ("Unable to {0}, the following properties " +
+                                   "are invalid : {1}").fmt(utrAction, validityState.join(", "))
+                    });
                     return;
                 }
 
-                self._updateGlobalSyncState(SyncState.SYNCED, function() {
-                    self._updateGlobalErrorState(null, function() {
-                        __return(responseData, err);
+                readyCb();
+            };
+
+            updateSteps['update to remote'] = function(data, err, readyCb) {
+                self._updateToRemote(function(responseData, err) {
+                    if (_.def(err)) {
+                        readyCb(null, err);
+                        return;
+                    }
+
+                    self._updateGlobalSyncState(SyncState.SYNCED, function() {
+                        self._updateGlobalErrorState(null, function() {
+                            readyCb(responseData, err);
+                        });
                     });
                 });
-            });
+            };
+
+            _.execInSeries(updateSteps, __return);
         },
 
         _wantToUpdateFromRemote : function(origin, data, updateReadyCb) {
@@ -746,6 +890,11 @@
                 return this._stateProcessingInitialized;
             }
 
+
+            return (this._stateProcessingInitialized = this._resetStates());
+        },
+
+        _resetStates : function() {
             this._state = {
                 //The actual state property values
                 data            : {},
@@ -774,7 +923,7 @@
                 validity        : {}
             };
 
-            return (this._stateProcessingInitialized = true);
+            return true;
         },
 
         /**
@@ -811,6 +960,42 @@
             stateData = this._state[stateType];
 
             return stateData;
+        },
+
+        /**
+         *
+         * Get <stateType> update state data
+         *
+         * @param {string} stateType
+         *
+         * @returns {*}
+         *
+         */
+        _getUpdatedState : function(stateType) {
+            var iName               = _.exec(this, 'getIName') || "[UNKOWN]";
+            var me                  = "{0}::ModelProcessesState::_getUpdatedState".fmt(iName);
+
+            var updatedStateData    = null;
+
+            if (!this._stateProcessingInitialized) {
+                _l.error(me, "State processing not initialized (correctly), call _initStateProcessing() in " +
+                        "your model-constructor first");
+                return updatedStateData;
+            }
+
+            if (this.isValid() === false) {
+                _l.error(me, "Model is invalid, unable to getState");
+                return updatedStateData;
+            }
+
+            if (!_.string(stateType) || _.empty(stateType)) {
+                _l.error(me, "stateType is not valid, unable to get state data for stateType");
+                return updatedStateData;
+            }
+
+            updatedStateData = this._stateUpdated[stateType];
+
+            return updatedStateData;
         },
 
         /**
@@ -1380,7 +1565,7 @@
             }
 
             this._state.globalValidity = value;
-            this._stateUpdated.globalValidity = value;
+            this._stateUpdated.globalValidity = true;
             updated = true;
 
             this._dispatchToControllers("globalValidityStateUpdated", value, function(_err) {
