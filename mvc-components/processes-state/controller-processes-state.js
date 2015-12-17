@@ -108,7 +108,7 @@
          */
 
         resetData : function(readyCb) {
-            this._dispatchToModel("wantToResetDataState", null, readyCb);
+            this._dispatchToModel("wantToResetModel", null, readyCb);
         },
 
         /**
