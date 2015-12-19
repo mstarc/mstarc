@@ -151,6 +151,8 @@
                     false,
                     function(property, value) {
                         self._state.data[property]  = value;
+
+                        if (_.func(self._onDataStateUpdate)) { self._onDataStateUpdate(property, value); }
                     },
                     arguments);
         },
@@ -163,6 +165,8 @@
                     true,
                     function(value) {
                         self._state.globalSyncing = value;
+
+                        if (_.func(self._onGlobalSyncUpdate)) { self._onGlobalSyncUpdate(value); }
                     },
                     arguments);
         },
@@ -175,6 +179,8 @@
                     true,
                     function(value) {
                         self._state.globalError = value;
+
+                        if (_.func(self._onGlobalErrorStateUpdate)) { self._onGlobalErrorStateUpdate(value); }
                     },
                     arguments);
         },
@@ -188,6 +194,8 @@
                     false,
                     function(property, value) {
                         self._state.error[property] = value;
+
+                        if (_.func(self._onErrorStateUpdate)) { self._onErrorStateUpdate(property, value); }
                     },
                     arguments);
         },
@@ -200,6 +208,8 @@
                     true,
                     function(value) {
                         self._state.globalValidity = value;
+
+                        if (_.func(self._onGlobalValidityStateUpdate)) { self._onGlobalValidityStateUpdate(value); }
                     },
                     arguments);
         },
@@ -212,6 +222,8 @@
                     false,
                     function(property, value) {
                         self._state.validity[property] = value;
+
+                        if (_.func(self._onValidityStateUpdate)) { self._onValidityStateUpdate(property, value); }
                     },
                     arguments);
         },
