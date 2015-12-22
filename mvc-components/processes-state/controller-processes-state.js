@@ -383,7 +383,7 @@
 
         _onUpdatedFromRemote : function(respondsData, err, updateReadyCb) {
             var callbackGiven   = _.func(updateReadyCb);
-            callbackGiven ? updateReadyCb(respondsData, err) :  _l.error(me, "Error occurred : ", _.stringify(err));
+            callbackGiven ? updateReadyCb(err) :  _l.error(me, "Error occurred : ", _.stringify(err));
         },
 
         _processModelEvent : function(customProcessMethodName, eventName, isGlobal, processingArguments) {
