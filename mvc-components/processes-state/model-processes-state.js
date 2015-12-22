@@ -484,7 +484,7 @@
          *
          * @param {object} origin
          * @param {object} data
-         * @param {function} [setDataProcessedCb]  function(result, err)
+         * @param {function} [setDataProcessedCb]  function(success, err)
          *
          */
         _wantToSetDataState : function(origin, data, setDataProcessedCb) {
@@ -865,7 +865,16 @@
                 if (_.def(err)) {
                     __return(data, err);
                 } else {
-                    self._wantToSetDataState(origin, data, __return);
+                    self._wantToSetDataState(origin, data, function(success, err) {
+                        if (_.def(err)) {
+                            err = {
+                                message : "Unable to set responds data in state",
+                                originalError : err
+                            };
+                        }
+
+                        __return(data, err);
+                    });
                 }
             });
         },
