@@ -411,6 +411,10 @@
 
             var properties = Object.getOwnPropertyNames(defaultData);
 
+            var all_errs = {
+                error_hash : {}
+            };
+
             _.iterateASync(
                     properties.length,
                     function(i, iterCb) {
@@ -447,11 +451,11 @@
                             });
                         };
 
-                        _.execInSeries(resetSteps, function(data, err) {
-                            var success = !_.def(err);
+                        _.execInSeries(resetSteps, function(data, _err) {
+                            var success = !_.def(_err);
                             if (!success) {
                                 var action = "resetting states for property {0}".fmt(property);
-                                err.error_hash[action] = err;
+                                all_errs.error_hash[action] = _err;
                             }
 
                             iterCb(success);
@@ -472,7 +476,7 @@
                         } else {
                             __return({
                                 message : "Unable to set default data properties",
-                                originalError : err
+                                originalError : all_errs
                             });
                         }
                     });
