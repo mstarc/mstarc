@@ -13,8 +13,6 @@
 
     /**
      *
-     * TODO : ADD PATCH HTTP METHOD
-     *
      * A mixin, intended to be used with ResourceManager sub-classes, that adds helper functions
      * to interact with a RESTful HTTP API.
      *
@@ -229,6 +227,60 @@
             }
 
             return this._request("put", resourceID, relatedResourcePath, data, resultCb);
+        },
+
+        /**
+         *
+         * Patch resource data
+         *
+         * _patch(resourceID, data, resultCb):
+         * Patch resource data of resource with ID <resourceID>
+         * e.g. PATCH /users/42
+         *
+         * _patch(resourceID, relatedResourcePath, data, resultCb):
+         * Patch resource data of related resource, at <relatedResourcePath>, of resource with ID <resourceID>
+         * e.g. PATCH /users/42/location/7
+
+         * @method _patch
+         *
+         * @param {string|number} resourceID        ID of resource to put
+         * @param {string} [relatedResourcePath]    Sub-path to related resource of the relevant resource
+         *                                          e.g. 'locations' or 'locations/7'
+         * @param {object} data                     New resource data to put
+         * @param {function} resultCb               function(data, err) request result callback
+         *
+         * @returns {boolean}                       True if initiation of request was successful, else false
+         *
+         * @protected
+         *
+         */
+        _patch : function(resourceID, relatedResourcePath, data, resultCb) {
+            var callError = false;
+            if (arguments.length < 3) {
+                callError = true;
+            } else if (arguments.length == 3) {
+                if (
+                        _.string(resourceID) &&
+                        _.obj(relatedResourcePath) &&
+                        _.func(data)
+                )
+                {                                                                       //_put(resourceID, data, resultCb):
+                    resultCb = data;
+
+                    data = relatedResourcePath;
+                    relatedResourcePath = undefined;
+                } else {
+                    callError = true;
+                }
+            }
+
+            if (callError) {
+                var me = "{0}::SpeaksREST::_patch".fmt(this.getIName());
+                _l.error(me, "Calling convention not recognized, unable to fulfill the request");
+                return false;
+            }
+
+            return this._request("patch", resourceID, relatedResourcePath, data, resultCb);
         },
 
         /**
