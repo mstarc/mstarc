@@ -199,6 +199,9 @@
          * Then, when calling _updateDataState('title', value, updateProcessedCb) the above methods is
          * called just before the controllers are notified.
          *
+         *
+         * TODO : documentation on wantToResetState event and _didResetStates()
+         *
          * @class   ModelProcessesState
          * @module  M*C
          *
@@ -969,8 +972,12 @@
                 validity        : {}
             };
 
+            this._didResetStates();
+
             return true;
         },
+
+        _didResetStates : function() {},
 
         /**
          *

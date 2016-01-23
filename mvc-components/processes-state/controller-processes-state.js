@@ -96,7 +96,7 @@
          *  updateToRemote(updateReadyCb)               send local property values to server
          *                                              updateReadyCb(responseData, err)
          *
-         *  updateFromRemote(updateReadyCb)             get remote property values from server
+         *  updateFromRemote(updateReadyCb)             Get remote property values from server
          *                                              updateReadyCb(responseData, err)
          *
          *
@@ -133,13 +133,16 @@
 
         /**
          *
-         * @param updateReadyCb     function(result, err), value of result depends on implementation
+         * Get remote property values from server based on some optional context
+         *
+         * @param {function} updateReadyCb     function(result, err), value of result depends on implementation
          *
          */
-        updateFromRemote : function(updateReadyCb) {
+        updateFromRemote : function(updateReadyCb, context) {
+
             this._wantToUpdateFromRemote(
                     this,
-                    null,
+                    context,
                     updateReadyCb);
         },
 
