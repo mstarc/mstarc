@@ -823,7 +823,7 @@
          * @protected
          */
         _wantToUpdateFromRemote : function(origin, data, updateReadyCb) {
-            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
+            var iName           = _.exec(this, 'getIName') || "[UNKNOWN]";
             var me              = "{0}::ModelProcessesState::_wantToUpdateFromRemote".fmt(iName);
             var self            = this;
 
