@@ -313,14 +313,20 @@
             }
 
             if (_.func(this._onWantToUpdateToRemote)) {
-                this._onWantToUpdateToRemote(property, newValue);
+                this._onWantToUpdateToRemote();
             }
 
             this._dispatchToModel(
                     "wantToUpdateToRemote",
                     data,
                     function(responseData, err) {
-                        self._onUpdatedToRemote(responseData, err, function(err) {
+                        var onUpdatedToRemote = _.func(self._onUpdatedToRemote) ?
+                            self._onUpdatedFromRemote.bind(self) :
+                            // Dummy function that calls callback immediately
+                            function(respondsData, err, callback) {
+                                callback();
+                            };
+                        onUpdatedToRemote(responseData, err, function(err) {
                             if (_.def(err)) {
                                 __returnError(err);
                                 return;
@@ -329,14 +335,6 @@
                             if (callbackGiven) { updateReadyCb(responseData); }
                         });
                     });
-        },
-
-        _onUpdatedToRemote : function(responseData, err, updateReadyCb) {
-            var iName           = _.exec(this, 'getIName') || "[UNKOWN]";
-            var me              = "{0}::ControllerProcessesState::_onUpdatedToRemote".fmt(iName);
-
-            var callbackGiven   = _.func(updateReadyCb);
-            callbackGiven ? updateReadyCb(responseData, err) :  _l.error(me, "Error occurred : ", _.stringify(err));
         },
 
         _wantToUpdateFromRemote : function(origin, data, updateReadyCb) {
@@ -366,14 +364,20 @@
             }
 
             if (_.func(this._onWantToUpdateFromRemote)) {
-                this._onWantToUpdateFromRemote(property, newValue);
+                this._onWantToUpdateFromRemote();
             }
 
             this._dispatchToModel(
                     "wantToUpdateFromRemote",
                     data,
                     function(respondsData, err) {
-                        self._onUpdatedFromRemote(respondsData, err, function(err) {
+                        var onUpdatedFromRemote = _.func(self._onUpdatedFromRemote) ?
+                            self._onUpdatedFromRemote.bind(self) :
+                            // Dummy function that calls callback immediately
+                            function(respondsData, err, callback) {
+                                callback();
+                            };
+                        onUpdatedFromRemote(respondsData, err, function(err) {
                             if (_.def(err)) {
                                 __returnError(err);
                                 return;
@@ -382,11 +386,6 @@
                             if (callbackGiven) { updateReadyCb(respondsData); }
                         });
                     });
-        },
-
-        _onUpdatedFromRemote : function(respondsData, err, updateReadyCb) {
-            var callbackGiven   = _.func(updateReadyCb);
-            callbackGiven ? updateReadyCb(err) :  _l.error(me, "Error occurred : ", _.stringify(err));
         },
 
         _processModelEvent : function(customProcessMethodName, eventName, isGlobal, processingArguments) {
