@@ -321,11 +321,12 @@
                     data,
                     function(responseData, err) {
                         var onUpdatedToRemote = _.func(self._onUpdatedToRemote) ?
-                            self._onUpdatedFromRemote.bind(self) :
+                            self._onUpdatedToRemote.bind(self) :
                             // Dummy function that calls callback immediately
                             function(respondsData, err, callback) {
                                 callback();
                             };
+                        
                         onUpdatedToRemote(responseData, err, function(err) {
                             if (_.def(err)) {
                                 __returnError(err);
@@ -377,6 +378,7 @@
                             function(respondsData, err, callback) {
                                 callback();
                             };
+
                         onUpdatedFromRemote(respondsData, err, function(err) {
                             if (_.def(err)) {
                                 __returnError(err);
