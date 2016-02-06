@@ -220,7 +220,7 @@
         },
 
         isAndroidTablet : function() {
-            return this.isAndroid() && (!('mobile' in this.__agent()));
+            return this.isAndroid() && (this.__agent().indexOf('mobile') < 0);
         },
 
 
