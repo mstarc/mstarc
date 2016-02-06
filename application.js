@@ -204,20 +204,34 @@
         },
 
         isMobile : function() {
-            return !_.empty(navigator.userAgent.match(/(iPhone|iPod|iPad|Android|BlackBerry|IEMobile)/)) ||
-                    this.isFirefoxOS();
+            return !_.empty(this.__agent().match(/(iPhone|iPod|iPad|Android|BlackBerry|IEMobile)/i));
+        },
+
+        isiPad : function() {
+            return !_.empty(this.__agent().match(/iPad/i));
         },
 
         isiOS : function() {
-            return !_.empty(navigator.userAgent.match(/(iPhone|iPod|iPad)/));
+            return !_.empty(this.__agent().match(/(iPhone|iPod|iPad)/i));
         },
 
         isAndroid : function() {
-            return !_.empty(navigator.userAgent.match(/(Android)/));
+            return !_.empty(this.__agent().match(/(Android)/i));
         },
 
+        isAndroidTablet : function() {
+            return this.isAndroid() && (!('mobile' in this.__agent()));
+        },
+
+
+        /**
+         *
+         * @Deprecated
+         *
+         * @returns {boolean}
+         */
         isFirefoxOS : function() {
-            return !_.empty(navigator.userAgent.match(/(Mozilla.*Mobile)/));
+            return !_.empty(this.__agent().match(/(Mozilla.*Mobile)/));
         },
 
         /*********************************************************************
@@ -239,6 +253,16 @@
             }
 
             return success;
+        },
+
+        /*********************************************************************
+         *
+         * PRIVATE METHODS
+         *
+         *********************************************************************/
+
+        __agent : function() {
+            return (navigator.userAgent || navigator.vendor || window.opera || "").toLowerCase();
         }
 
     });
