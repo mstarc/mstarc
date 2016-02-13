@@ -30,7 +30,7 @@
          *   sendEvent(eventName, data, ...) method
          *
          * @class           SimpleStateManager
-         * @extends         Controller
+         * @extends         Base
          *
          * @constructor
          *
