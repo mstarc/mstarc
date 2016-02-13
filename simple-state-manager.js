@@ -21,7 +21,7 @@
 
         /**
          *
-         * Simple Statemanager.
+         * Simple State Manager.
          *
          * *** Created for simple apps that don't require concurrent states or nested states.
          *     Please consider state managers like Stativus or Ember statemanager as alternative. ****
