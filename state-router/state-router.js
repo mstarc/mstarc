@@ -17,6 +17,8 @@
 
     NS.StateRouter   = Class([Base, Configurable], {
 
+        _isBlocked              : false,
+
         _stateChangeHandler     : null,
 
         /**
@@ -63,14 +65,14 @@
          *
          *                                          Returns true on success, else false
          *
-         *  _route(request, fromState)          If the given request matches a route its handler will be called.
+         *  _route(request, fromState)              If the given request matches a route its handler will be called.
          *                                          The fromState needs to be forwarded to the handler, see above.
+         *
          *                                          Returns true on success, else false
          *
          *
          *  _generateRequest(routeName, data)       routeName for which to generate request string based on data
          *                                          Optional data to use to generate request string
-         *
          *
          *                                          Returns request string on success, else null
          *
@@ -128,6 +130,26 @@
             this._valid = this._setup();
         },
 
+        block : function() {
+            var me      = "StateRouter::block";
+
+            if (!this.isValid()) {
+                _l.error(me, "State router is invalid, unable to block the router");
+                return;
+            }
+
+            this._isBlocked = true;
+        },
+
+        unblock : function() {
+            if (!this.isValid()) {
+                _l.error(me, "State router is invalid, unable to unblock the router");
+                return;
+            }
+
+            this._isBlocked = false;
+        },
+
         /**
          *
          * Add a route, mapping a request pattern to a state
@@ -158,6 +180,7 @@
                 return success;
             }
 
+            _l.info(me, "Adding route [{0}] ===> [{1}]".fmt(requestPattern, stateName));
             success =  this._createRoute(stateName, requestPattern, function(matchedRequest, data, fromState) {
                 self._goToState(stateName, data, fromState);
 
@@ -188,14 +211,24 @@
                 return success;
             }
 
+            if (this._isBlocked === true) {
+                _l.debug(me, "I'm blocked, will not route request [{0}]".fmt(request));
+                return false;
+            }
+
             return this._route(request, fromState);
         },
 
         goTo : function(stateName, data, fromState) {
             var me      = "StateRouter::goTo";
 
-            if (this.isValid()) {
+            if (!this.isValid()) {
                 _l.error(me, "State router is invalid, unable to go to state [{0}]".fmt(stateName));
+                return false;
+            }
+
+            if (this._isBlocked === true) {
+                _l.debug(me, "I'm blocked, will not go to state [{0}]".fmt(stateName));
                 return false;
             }
 

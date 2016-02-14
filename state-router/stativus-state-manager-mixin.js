@@ -93,7 +93,7 @@
             if (!_.hasMethod(fromState, "goToState")) {
                 //is it a string?
                 if (_.string(fromState) && (!_.empty(fromState))) {
-                    fromState = this._stateManager(fromState);
+                    fromState = this._stateManager.getState(fromState);
                 }
             }
 
