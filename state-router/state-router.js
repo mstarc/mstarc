@@ -286,7 +286,7 @@
             return false;
         },
 
-        _generateRequest(routeName, data) {
+        _generateRequest : function(routeName, data) {
             _l.error("StateRouter::_generateRequest", "No implementation provided, " +
                     "implement this method in your child class (or use a given router mixin)");
 
