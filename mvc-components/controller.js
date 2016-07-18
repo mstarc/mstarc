@@ -139,6 +139,38 @@
                     readyCb);
         },
 
+        /**
+         * @override
+         * @param component
+         */
+        connect : function(component) {
+            var me = this;
+            var connected = NS.Controller.$superp.connect.call(this, component);
+
+            if(!connected || !_.hasMethod(component, 'getSubComponents')) {
+                _l.error(me, "Could not connect subcomponents.");
+                return false;
+            }
+
+            var ownSubComponents = this.getSubComponents();
+            var otherSubComponents = component.getSubComponents();
+
+            for(var name in ownSubComponents) {
+                var other = otherSubComponents[name];
+                if(!_.hasMethod(other, 'connect')) {
+                    _l.error(me, "Could not connect subcomponent '{0}'.".fmt(name));
+                    return false;
+                }
+
+                // Connect subcomponent to other component's subcomponent with same name
+                if(!ownSubComponents[name].connect(other)) {
+                    return false;
+                }
+            }
+
+            return true; // success
+        },
+
         /*********************************************************************
          *
          * PROTECTED METHODS

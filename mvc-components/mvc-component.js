@@ -25,6 +25,11 @@
         _isReady    : false,
         _eventQueue : null,
 
+        _subComponents     : null,
+
+        _subComponentName  : null,
+        _parentComponent   : null,
+
         /**
          *
          * MVCComponent provides functionality shared by the Model, View and Controller classes.
@@ -64,6 +69,7 @@
             NS.MVCComponent.$super.call(this, componentName);
 
             this._eventQueue = [];
+            this._subComponents = {};
 
             this._addConfigProperties(config);
         },
@@ -229,11 +235,67 @@
             return false;
         },
 
+        setSubComponent : function(name, component) {
+            var me = this + "::_setSubComponent";
+            var valid = _.validate(me, {
+                name        : [name, 'string'],
+                component  : [component, _.instanceof(NS.MVCComponent), "Invalid MVCComponent."]
+            }, "Could not set subcomponent.");
+            this._subComponents[name] = component;
+
+            valid.component.setParentComponent(this, valid.name);
+        },
+
+        getSubComponents : function() {
+            return this._subComponents;
+        },
+
+        setParentComponent : function(parent, subComponentName) {
+            var me = this + "::setIsSubController";
+            var valid = _.validate(me, {
+                parent              : [parent, _.instanceof(NS.MVCComponent), "Invalid MVCComponent."],
+                subComponentName    : [subComponentName, 'string']
+            }, "Could not set parent controller.");
+            if(!valid) return;
+
+            this._parentComponent = valid.parent;
+            this._subComponentName = valid.subComponentName;
+        },
+
+        isSubComponent : function() {
+            return this._parentComponent !== null;
+        },
+
+        processSubComponentEvent : function(subComponentName, event, data) {
+            var me = this + "::processSubComponentEvent";
+            var valid = _.validate(me, {
+                subControllerName   : [subComponentName, subComponentName in this._subComponents, "Subcomponent name not found."],
+                event               : [event, 'string'],
+                data                : [data, 'obj', {default: {}, warn: _.def(data)}]
+            }, "Could not process subcomponent event.");
+            if(!valid) return;
+
+            // Call listener
+            var customMethodName = '_{0}'.fmt(event);
+            var handler = this[customMethodName];
+            if(_.func(handler)) {
+                handler.call(this, subComponentName, data);
+            }
+        },
+
         /*********************************************************************
          *
          * PROTECTED METHODS
          *
          *********************************************************************/
+
+        _eventOut : function(event, data) {
+            if(this.isSubComponent()) {
+                this._parentComponent.processSubComponentEvent(this._subComponentName, event, data);
+            } else {
+                this._stateManager.sendEvent(event, data);
+            }
+        },
 
         _componentIsReady : function() {
             return this._isReady;

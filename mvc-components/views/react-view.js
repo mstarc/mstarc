@@ -45,6 +45,8 @@
 
         _DOMContainer       : null,
 
+        _subViewContainers : null,
+
         /**
          *
          * Hooks up a React UI to a MVC combination. A react UI is a high-level React element that combines multiple
@@ -150,6 +152,7 @@
 
             this._reactUIClass = reactUIClass;
             this._DOMContainer = DOMContainer;
+            this._subViewContainers = {};
 
             this._setStateScheduling = {
                   scheduled : false,
@@ -161,6 +164,23 @@
 
         isRendered : function() {
             return this._didRender && _.object(this._reactUIInstance);
+        },
+
+        setSubComponent : function(name, view, container) {
+            var me = this + "::setSubComponent";
+            var valid = _.validate(me, {
+                view        : [view, _.instanceof(NS.ReactView), "Invalid ReactView."],
+                container   : [container, 'string']
+            });
+            if(!valid) return false;
+
+            this._subViewContainers[name] = container;
+
+            return NS.View.$superp.setSubComponent.call(this, name, valid.view);
+        },
+
+        getDOMContainer : function() {
+            return this._DOMContainer;
         },
 
         /*********************************************************************
@@ -282,6 +302,7 @@
             var ui = this._getReactUIInstance();
             if (_.hasMethod(ui, "setState", "React UI Instance")) {
                 ui.setState(this._state);
+
                 __return();
             } else {
                 __return("No valid React UI instance available, unable to render state");
@@ -296,6 +317,18 @@
                 _l.debug(me, "Set state was scheduled, executing now ...");
                 this._setStateScheduling.scheduled = false;
                 this._renderState();
+            }
+        },
+
+        _onComponentDidUpdate : function() {
+            var me = "{0}::ReactView::_onComponentDidUpdate".fmt(this.getIName());
+
+            for(var name in this._subComponents) {
+                var view = this._subComponents[name];
+                var container = this._subViewContainers[name];
+                var domElement = view.getDOMContainer();
+
+                $('#'+container).html(domElement);
             }
         },
 
@@ -315,6 +348,7 @@
 
             var __createProps = function() {
                 return {
+                    onComponentDidUpdate: self._onComponentDidUpdate.bind(self),
                     onComponentDidMount : self._onComponentDidMount.bind(self)
                 };
             };

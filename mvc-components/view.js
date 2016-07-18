@@ -140,6 +140,16 @@
             return true;
         },
 
+        setSubComponent : function(name, view) {
+            var me = this + "::setSubComponent";
+            var valid = _.validate(me, {
+                view        : [view, _.instanceof(NS.View), "Invalid View."]
+            });
+            if(!valid) return false;
+
+            return NS.View.$superp.setSubComponent.call(this, name, valid.view);
+        },
+
         /*********************************************************************
          *
          * PROTECTED METHODS
@@ -179,6 +189,11 @@
         _onViewRendered : function() {
             var me = "{0}::View::_onViewRendered".fmt(this.getIName());
             _l.debug(me, "View rendered");
+
+            // Render sub views
+            for(var i in this._subComponents) {
+                this._subComponents[i].render();
+            }
 
             this._didRender = true;
 
